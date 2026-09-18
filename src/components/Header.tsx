@@ -43,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-emerald-700/70 truncate max-w-[190px] sm:max-w-xs font-medium">
-              {language === 'bn' ? 'প্রকৌশল ভর্তি কুইজ ও মডেল টেস্ট' : 'Engineering Admission Model Test'}
+              {language === 'bn' ? 'প্রকৌশল ভর্তি কুইজ ও মডেল টেস্ট' : 'Admission quiz test'}
             </p>
           </div>
         </button>
@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenProfile}
               className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition-all"
-              title="প্রোফাইল ও সিজিপিএ দেখুন"
+              title="প্রোফাইল দেখুন"
             >
               <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
               <span className="hidden md:inline max-w-[90px] truncate">{profile.name}</span>

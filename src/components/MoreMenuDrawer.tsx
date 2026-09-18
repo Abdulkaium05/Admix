@@ -2,7 +2,12 @@ import React from 'react';
 import { UserProfile, AppView } from '../types';
 import { translations, Language } from '../utils/i18n';
 import { EngineerLogo } from './EngineerLogo';
-import { getTodayStudyMinutes, formatDuration } from '../utils/storage';
+import {
+  getTodayStudyMinutes,
+  formatDuration,
+  getAdmissionTargetDate,
+  calculateAdmissionCountdown,
+} from '../utils/storage';
 import {
   X,
   PlusCircle,
@@ -15,6 +20,7 @@ import {
   ChevronRight,
   Sparkles,
   Clock,
+  CalendarClock,
 } from 'lucide-react';
 
 interface MoreMenuDrawerProps {
@@ -26,6 +32,7 @@ interface MoreMenuDrawerProps {
   onToggleLanguage: () => void;
   profile: UserProfile | null;
   onOpenProfileModal: () => void;
+  onOpenCountdownModal: () => void;
   questionCount: number;
 }
 
@@ -38,10 +45,14 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
   onToggleLanguage,
   profile,
   onOpenProfileModal,
+  onOpenCountdownModal,
   questionCount,
 }) => {
   const t = translations[language];
   const todayMins = getTodayStudyMinutes();
+  const targetAdmissionDate = getAdmissionTargetDate();
+  const countdownInfo = calculateAdmissionCountdown(targetAdmissionDate);
+  const toBn = (n: number) => n.toLocaleString('bn-BD');
 
   if (!isOpen) return null;
 
@@ -221,6 +232,25 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
             <span>{t.aiSupport} (Admix AI Chat)</span>
           </button>
 
+          {/* Admission Exam Countdown Option */}
+          <button
+            onClick={() => {
+              onClose();
+              onOpenCountdownModal();
+            }}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-900 hover:bg-emerald-50 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <CalendarClock className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+              <span>{language === 'bn' ? 'অ্যাডমিশন কাউন্টডাউন' : 'Admission Countdown'}</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-mono font-bold border border-emerald-200">
+              {countdownInfo.isPassed
+                ? (language === 'bn' ? 'তারিখ উত্তীর্ণ' : 'Passed')
+                : (language === 'bn' ? `${toBn(countdownInfo.days)} দিন বাকি` : `${countdownInfo.days}d left`)}
+            </span>
+          </button>
+
           <button
             onClick={() => {
               onClose();
@@ -229,7 +259,7 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-900 hover:bg-emerald-50 transition-all"
           >
             <GraduationCap className="w-4 h-4 text-emerald-600" />
-            <span>সিজিপিএ ক্যালকুলেটর ও প্রোফাইল</span>
+            <span>{t.profile}</span>
           </button>
 
           <div className="pt-3 my-2 border-t border-emerald-100">

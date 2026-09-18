@@ -23,6 +23,7 @@ import { QuizImportScreen } from './components/QuizImportScreen';
 import { AiSupportScreen } from './components/AiSupportScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { StudyTimeScreen } from './components/StudyTimeScreen';
+import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
 
 export default function App() {
   // 1. Language State (Theme is permanently White & Light Green)
@@ -42,6 +43,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(() => getUserProfile());
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !getUserProfile());
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false);
+  const [isCountdownModalOpen, setIsCountdownModalOpen] = useState<boolean>(false);
 
   // 3. Navigation View State
   const [currentView, setCurrentView] = useState<AppView>('home');
@@ -249,7 +251,15 @@ export default function App() {
         onToggleLanguage={toggleLanguage}
         profile={profile}
         onOpenProfileModal={() => setIsOnboardingOpen(true)}
+        onOpenCountdownModal={() => setIsCountdownModalOpen(true)}
         questionCount={allQuestions.length}
+      />
+
+      {/* Admission Countdown Modal */}
+      <AdmissionCountdownModal
+        isOpen={isCountdownModalOpen}
+        onClose={() => setIsCountdownModalOpen(false)}
+        language={language}
       />
 
       {/* Mandatory Onboarding & Profile Modal */}

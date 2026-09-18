@@ -45,48 +45,74 @@ async function startServer() {
 
       const client = getGeminiClient();
       if (!client) {
-        // Helpful fallback response when API key is pending
         res.json({
           answer: language === "bn"
-            ? `[ডুয়েট অফলাইন সহায়িকা]\nবিষয়: ${subject || "সাধারণ"}\nআপনার প্রশ্ন: "${question}"\n\nপরামর্শ: DUET ভর্তি পরীক্ষার জন্য মূল সূত্র ও বিগত বছরের প্রশ্ন ভালো করে চর্চা করুন। (অনলাইন AI পূর্ণ বিশ্লেষণের জন্য সার্ভারে GEMINI_API_KEY সক্রিয় করুন)।`
-            : `[DUET Offline Guide]\nSubject: ${subject || "General"}\nYour Question: "${question}"\n\nTip: Practice standard DUET past questions and core formulas thoroughly.`,
+            ? `**[ডুয়েট অফলাইন সহায়িকা]**\n\n**প্রশ্ন:** ${question}\n\n**পরামর্শ:** DUET ভর্তি পরীক্ষার জন্য মূল থিওরি, সূত্র ও বিগত বছরের প্রশ্ন ভালো করে চর্চা করুন। সার্ভারে এআই সক্রিয় করতে সেটিংস থেকে GEMINI_API_KEY নিশ্চিত করুন।`
+            : `**[DUET Offline Guide]**\n\n**Question:** ${question}\n\n**Advice:** Master the foundational theories, formulas, and past DUET question patterns.`,
           isFallback: true,
         });
         return;
       }
 
-      const systemInstruction = `You are the expert DUET (Dhaka University of Engineering & Technology) Admission Preparation Mentor and Tutor.
-The user is preparing for the highly competitive DUET admission test (Diploma to B.Sc. Engineering).
-The exam covers:
+      const systemInstruction = `You are the premier DUET (Dhaka University of Engineering & Technology) Admission Preparation Mentor, Academic Coach, and Tutor.
+The student is preparing for the DUET admission test (Diploma to B.Sc. Engineering).
+The exam structure covers:
 1. Department Subjects: Civil Engineering (RCC, Structural Mechanics, Hydraulics, Surveying, Soil Mechanics, Highway/Transportation, Building Construction, Estimating).
-2. Non-Department Subjects: Mathematics (Calculus, Trigonometry, Coordinate Geometry, Algebra, Matrix), Physics (Mechanics, Optics, Thermodynamics, Electricity, Modern Physics), Chemistry (Periodic Table, Gas Laws, Organic Chemistry, Chemical Bonding, Stoichiometry), and English (Grammar, Preposition, Vocabulary, Error correction).
+2. Non-Department Subjects: Mathematics (Calculus, Trigonometry, Coordinate Geometry, Algebra, Matrices), Physics (Mechanics, Optics, Thermodynamics, Electricity, Modern Physics), Chemistry (Periodic Table, Gas Laws, Organic Chemistry, Chemical Bonding, Stoichiometry), and English (Grammar, Preposition, Vocabulary, Error correction).
 
 Guidelines:
-- Provide clear, accurate, step-by-step explanations.
-- If asked a mathematical, physics, or civil formula/problem, provide the step-by-step derivation/solution and state the relevant formulas clearly.
-- If the user asks in Bengali, reply primarily in clear academic Bengali with technical terms in English/Bengali as common in DUET coaching.
-- If the user asks in English or language is requested as 'en', reply in clear English.
-- Keep explanations structured, concise, and focused on DUET admission exam patterns.`;
+- Provide clear, accurate, step-by-step mathematical and conceptual explanations.
+- If asked for formulas or derivations, write the formulas neatly with explanations of variables.
+- Write in clean, supportive Bengali (with standard English technical terms where appropriate) or in English if requested.
+- Use markdown formatting with bold headings, bullet points, and code blocks for math when helpful.
+- Keep answers encouraging, student-friendly, and specifically tailored for DUET entrance success.`;
 
-      const prompt = `Subject Area: ${subject || "General / DUET Admission"}\nPreferred Language: ${language === "en" ? "English" : "Bengali"}\n\nStudent's Question:\n${question}`;
+      const prompt = `Subject: ${subject || "DUET Admission Test"}\nPreferred Language: ${language === "en" ? "English" : "Bengali"}\n\nStudent Question:\n${question}`;
 
-      const response = await client.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          systemInstruction,
-          temperature: 0.4,
-        },
-      });
+      // Try responsive models in order: gemini-3.6-flash, gemini-3.8-flash, gemini-flash-latest
+      const candidateModels = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-flash-latest"];
+      let answerText = "";
+      let lastError: any = null;
 
-      res.json({
-        answer: response.text || (language === "bn" ? "উত্তর প্রদান করা সম্ভব হয়নি।" : "Could not generate response."),
-        isFallback: false,
-      });
+      for (const model of candidateModels) {
+        try {
+          const response = await client.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              systemInstruction,
+              temperature: 0.4,
+            },
+          });
+          if (response.text) {
+            answerText = response.text;
+            break;
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Model ${model} failed with:`, err?.message || err);
+        }
+      }
+
+      if (answerText) {
+        res.json({
+          answer: answerText,
+          isFallback: false,
+        });
+      } else {
+        // If models are temporarily unreachable, provide an informative mentor answer
+        res.json({
+          answer: language === "bn"
+            ? `**[ডুয়েট এআই মেন্টর প্রস্তুতি নোট]**\n\nআপনার প্রশ্ন: **${question}**\n\n📌 **গুরুত্বপূর্ণ পরামর্শ:**\n- ডুয়েট ভর্তি পরীক্ষায় সিভিল ও নন-ডিপার্টমেন্ট (ম্যাথ, পদার্থ, রসায়ন, ইংরেজি) প্রতিটি অংশের নম্বর সমানভাবে গুরুত্বপূর্ণ।\n- প্রতিদিন নিয়মিত স্টাডি টাইম ট্র্যাক করুন এবং বিগত বছরের প্রশ্ন সমাধান করুন।\n\n*(সার্ভিসটি পুনরায় চেষ্টা করলে পূর্ণাঙ্গ লাইভ বিশ্লেষণ পেয়ে যাবেন)*`
+            : `**[DUET AI Mentor Note]**\n\nQuestion: **${question}**\n\nKey focus: Practice past DUET questions, core structural calculations, and calculus applications regularly.`,
+          isFallback: true,
+          error: lastError?.message,
+        });
+      }
     } catch (err: any) {
-      console.error("Gemini API Error:", err?.message || err);
+      console.error("Gemini API Route Error:", err?.message || err);
       res.status(500).json({
-        error: "এআই সার্ভিসে সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর চেষ্টা করুন।",
+        error: "এআই সার্ভিসে সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।",
         details: err?.message,
       });
     }

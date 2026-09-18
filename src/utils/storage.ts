@@ -314,12 +314,112 @@ export function calculateStudyDurationMinutes(startTime: string, endTime: string
   return 24 * 60 - startMin + endMin;
 }
 
+export function clearAllStudySessions(): void {
+  try {
+    localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify([]));
+  } catch (e) {
+    console.error('Failed to clear study sessions', e);
+  }
+}
+
+export function resetSampleStudySessions(): StudySession[] {
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const sampleSessions: StudySession[] = [
+      {
+        id: 'study-sample-1',
+        date: todayStr,
+        startTime: '06:00',
+        endTime: '09:00',
+        durationMinutes: 180,
+        subject: 'সিভিল ইঞ্জিনিয়ারিং',
+        topic: 'সার্ভেয়িং ও হাইড্রোলিক্স থিওরি এবং অঙ্ক',
+        notes: 'সকাল ৬:০০ - ৯:০০ টা পর্যন্ত পড়া হয়েছে',
+        createdAt: Date.now() - 3600000 * 4,
+      },
+      {
+        id: 'study-sample-2',
+        date: todayStr,
+        startTime: '10:00',
+        endTime: '12:00',
+        durationMinutes: 120,
+        subject: 'গণিত (Mathematics)',
+        topic: 'ক্যালকুলাস ইন্টিগ্রেশন ও ডিফারেনশিয়াল সমীকরণ',
+        notes: 'সকাল ১০:০০ - ১২:০০ টা পর্যন্ত পড়া হয়েছে',
+        createdAt: Date.now() - 3600000 * 2,
+      },
+    ];
+    localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(sampleSessions));
+    return sampleSessions;
+  } catch (e) {
+    console.error('Failed to reset sample study sessions', e);
+    return [];
+  }
+}
+
+// Admission Target Date Key
+export const ADMISSION_TARGET_DATE_KEY = 'admix_admission_target_date';
+
+export function getAdmissionTargetDate(): string {
+  try {
+    const stored = localStorage.getItem(ADMISSION_TARGET_DATE_KEY);
+    if (stored) return stored;
+    // Default to ~60 days ahead
+    const d = new Date();
+    d.setDate(d.getDate() + 60);
+    const defaultDate = d.toISOString().slice(0, 10);
+    localStorage.setItem(ADMISSION_TARGET_DATE_KEY, defaultDate);
+    return defaultDate;
+  } catch (e) {
+    return '2026-11-20';
+  }
+}
+
+export function setAdmissionTargetDate(dateStr: string): void {
+  try {
+    localStorage.setItem(ADMISSION_TARGET_DATE_KEY, dateStr);
+  } catch (e) {
+    console.error('Failed to set admission target date', e);
+  }
+}
+
+export function calculateAdmissionCountdown(targetDateStr: string) {
+  const target = new Date(`${targetDateStr}T09:00:00`);
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+
+  if (diffMs <= 0) {
+    return {
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+      isPassed: true,
+      totalMs: 0,
+    };
+  }
+
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+  return {
+    days,
+    hours,
+    minutes,
+    seconds,
+    isPassed: false,
+    totalMs: diffMs,
+  };
+}
+
 /**
- * Format minutes to human readable string (e.g. 3h 15m or ৩ ঘণ্টা ১৫ মিনিট)
+ * Format minutes to human readable string (e.g. 3h 15m or ৩ ঘ ১৫ মি, ৫ ঘ)
  */
 export function formatDuration(minutes: number, language: 'bn' | 'en' = 'bn'): string {
   if (!minutes || minutes <= 0) {
-    return language === 'bn' ? '০ মিনিট' : '0 min';
+    return language === 'bn' ? '০ মি' : '0 min';
   }
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -327,11 +427,11 @@ export function formatDuration(minutes: number, language: 'bn' | 'en' = 'bn'): s
   if (language === 'bn') {
     const toBn = (n: number) => n.toLocaleString('bn-BD');
     if (hours > 0 && mins > 0) {
-      return `${toBn(hours)} ঘণ্টা ${toBn(mins)} মিনিট`;
+      return `${toBn(hours)} ঘ ${toBn(mins)} মি`;
     } else if (hours > 0) {
-      return `${toBn(hours)} ঘণ্টা`;
+      return `${toBn(hours)} ঘ`;
     } else {
-      return `${toBn(mins)} মিনিট`;
+      return `${toBn(mins)} মি`;
     }
   } else {
     if (hours > 0 && mins > 0) {

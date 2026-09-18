@@ -4,6 +4,8 @@ import {
   getStudySessions,
   saveStudySession,
   deleteStudySession,
+  clearAllStudySessions,
+  resetSampleStudySessions,
   calculateStudyDurationMinutes,
   formatDuration,
 } from '../utils/storage';
@@ -23,6 +25,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  AlertTriangle,
+  RefreshCw,
+  Check,
 } from 'lucide-react';
 
 interface StudyTimeScreenProps {
@@ -133,6 +138,25 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
       deleteStudySession(id);
       loadSessions();
     }
+  };
+
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState<boolean>(false);
+  const [actionNotice, setActionNotice] = useState<string>('');
+
+  const handleClearAllHistory = () => {
+    clearAllStudySessions();
+    loadSessions();
+    setShowDeleteAllConfirm(false);
+    setActionNotice(language === 'bn' ? 'স্টাডি হিস্ট্রি সফলভাবে মুছে ফেলা হয়েছে।' : 'Study history cleared successfully.');
+    setTimeout(() => setActionNotice(''), 3000);
+  };
+
+  const handleResetSampleData = () => {
+    const samples = resetSampleStudySessions();
+    setSessions(samples);
+    setShowDeleteAllConfirm(false);
+    setActionNotice(language === 'bn' ? 'নমুনা টেস্ট স্টাডি ডাটা পুনরায় লোড করা হয়েছে।' : 'Sample test study data loaded.');
+    setTimeout(() => setActionNotice(''), 3000);
   };
 
   // Live Timer Actions
@@ -316,20 +340,97 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-emerald-100 p-4 shadow-2xs flex items-center gap-3.5">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-            <TrendingUp className="w-5 h-5" />
+        <div className="bg-white rounded-2xl border border-emerald-100 p-4 shadow-2xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] font-semibold text-emerald-700/80 block">
+                {language === 'bn' ? 'সর্বমোট স্টাডি টাইম' : 'Total Study Time'}
+              </span>
+              <span className="text-base sm:text-lg font-bold text-emerald-950">
+                {formatDuration(totalAllMinutes, language)}
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="text-[11px] font-semibold text-emerald-700/80 block">
-              {language === 'bn' ? 'সর্বমোট রেকর্ডকৃত পড়া' : 'Lifetime Study Logged'}
-            </span>
-            <span className="text-base sm:text-lg font-bold text-emerald-950">
-              {formatDuration(totalAllMinutes, language)}
-            </span>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowDeleteAllConfirm(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1"
+              title={language === 'bn' ? 'স্টাডি হিস্ট্রি ডিলিট করুন' : 'Delete study history'}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'হিস্ট্রি মুছুন' : 'Delete'}</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Action Notice Alert */}
+      {actionNotice && (
+        <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-700" />
+            <span>{actionNotice}</span>
+          </div>
+          <button
+            onClick={() => setActionNotice('')}
+            className="text-emerald-800 hover:text-emerald-950 text-xs font-bold underline"
+          >
+            {language === 'bn' ? 'ঠিক আছে' : 'OK'}
+          </button>
+        </div>
+      )}
+
+      {/* Delete All Confirmation Dialog / Banner */}
+      {showDeleteAllConfirm && (
+        <div className="p-4 rounded-2xl bg-rose-50/90 border border-rose-200 shadow-sm animate-in fade-in zoom-in-95 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-rose-950">
+                {language === 'bn' ? 'সর্বমোট স্টাডি টাইম হিস্ট্রি মুছবেন?' : 'Delete All Study History?'}
+              </h4>
+              <p className="text-xs text-rose-800/80 mt-0.5 leading-relaxed">
+                {language === 'bn'
+                  ? 'এটি আপনার রেকর্ডকৃত সমস্ত স্টাডি সেশন হিস্ট্রি পরিষ্কার করে ফেলবে। আপনি টেস্ট করার জন্য এখনই হিস্ট্রি মুছে ফেলতে পারেন এবং প্রয়োজনে পুনরায় নমুনা ডাটা যোগ করতে পারবেন।'
+                  : 'This will erase all recorded study sessions from your total study time. You can clear now for testing and re-add sample test data anytime.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-rose-200/70">
+            <button
+              type="button"
+              onClick={() => setShowDeleteAllConfirm(false)}
+              className="px-3 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-800 hover:bg-rose-100/50 text-xs font-bold transition-colors"
+            >
+              {language === 'bn' ? 'বাতিল' : 'Cancel'}
+            </button>
+            <button
+              type="button"
+              onClick={handleResetSampleData}
+              className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-xs font-bold transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'নমুনা ডাটা দিয়ে টেস্ট করুন' : 'Test with Sample Data'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleClearAllHistory}
+              className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'হ্যাঁ, সম্পূর্ণ হিস্ট্রি মুছুন' : 'Yes, Delete All History'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 3. ADD STUDY SESSION SECTION */}
       <div className="bg-white rounded-2xl border border-emerald-200/90 shadow-2xs overflow-hidden">
@@ -769,17 +870,63 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
       {/* 6. ALL HISTORY TAB (Grouped by Date) */}
       {activeTab === 'all_history' && (
         <div className="space-y-4">
+          {/* History Management Action Bar */}
+          <div className="bg-white rounded-2xl border border-emerald-100 p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-emerald-950">
+                {language === 'bn' ? 'মোট সংরক্ষিত সেশন:' : 'Total Logged Sessions:'}
+              </span>
+              <span className="text-xs font-mono font-bold bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded-md">
+                {sessions.length}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetSampleData}
+                className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition-colors flex items-center gap-1.5"
+                title={language === 'bn' ? 'টেস্ট করার জন্য ডেমো ডাটা লোড করুন' : 'Load sample test data'}
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{language === 'bn' ? 'নমুনা ডাটা লোড' : 'Load Sample Data'}</span>
+              </button>
+
+              {sessions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteAllConfirm(true)}
+                  className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1.5"
+                  title={language === 'bn' ? 'সব হিস্ট্রি মুছে ফেলুন' : 'Clear all history'}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'সম্পূর্ণ হিস্ট্রি মুছুন' : 'Clear All'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
           {allDates.length === 0 ? (
             <div className="bg-white rounded-2xl border border-emerald-100 p-8 text-center space-y-3">
               <Clock className="w-10 h-10 text-emerald-600 mx-auto" />
               <h3 className="text-sm font-bold text-emerald-950">
-                {language === 'bn' ? 'কোনো স্টাডি হিস্ট্রি এখনও পাওয়া যায়নি' : 'No study history available yet'}
+                {language === 'bn' ? 'কোনো স্টাডি হিস্ট্রি পাওয়া যায়নি' : 'No study history available'}
               </h3>
-              <p className="text-xs text-emerald-700/80">
+              <p className="text-xs text-emerald-700/80 max-w-sm mx-auto">
                 {language === 'bn'
-                  ? 'প্রতিদিনের পড়ার হিসাব রাখতে উপরের ফর্ম ব্যবহার করুন।'
-                  : 'Start logging your study sessions to build your routine history.'}
+                  ? 'আপনি সম্পূর্ণ হিস্ট্রি মুছে ফেলেছেন। টেস্ট করার জন্য নিচে ক্লিক করে নমুনা ডাটা লোড করতে পারেন অথবা নতুন পড়ার সময় যোগ করতে পারেন।'
+                  : 'You have cleared all study history. Click below to load sample test data or log a new study session.'}
               </p>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetSampleData}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-xs"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'টেস্টের জন্য নমুনা ডাটা যোগ করুন' : 'Add Test Sample Data'}</span>
+                </button>
+              </div>
             </div>
           ) : (
             allDates.map((dateStr) => {
