@@ -1,0 +1,7 @@
+{
+  "name": "Admix",
+  "description": "Admix - DUET admission preparation quiz exam app with 80-question model tests, daily study time calendar & tracker, offline support, question importer, AI mentor, BTEB CGPA calculator, and light green theme.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,0 +1,92 @@
+export type SubjectType = 'civil' | 'english' | 'math' | 'physics' | 'chemistry';
+export type CategoryType = 'department' | 'non_department';
+export type DepartmentType = 'civil' | 'eee' | 'me' | 'cse';
+
+export interface Question {
+  id: string;
+  category: CategoryType;
+  department: DepartmentType; // default 'civil'
+  subject: SubjectType;
+  questionBn: string;
+  questionEn?: string;
+  optionsBn: [string, string, string, string];
+  optionsEn?: [string, string, string, string];
+  correctAnswer: number; // 0, 1, 2, 3
+  explanationBn?: string;
+  explanationEn?: string;
+  isCustom?: boolean;
+  createdAt?: number;
+}
+
+export interface SemesterGrades {
+  s1?: number; // 5%
+  s2?: number; // 5%
+  s3?: number; // 10%
+  s4?: number; // 10%
+  s5?: number; // 20%
+  s6?: number; // 20%
+  s7?: number; // 20%
+  s8?: number; // 10%
+}
+
+export interface UserProfile {
+  name: string;
+  polytechnicRoll: string;
+  polytechnicName: string;
+  semesters: SemesterGrades;
+  calculatedCgpa: number;
+  isAverage: boolean;
+  department: DepartmentType;
+  completedOnboarding: boolean;
+}
+
+export interface QuizResult {
+  id: string;
+  quizName: string;
+  score: number;
+  totalMarks: number; // 120
+  correctCount: number;
+  wrongCount: number;
+  skippedCount: number;
+  totalQuestions: number; // 80
+  percentage: number;
+  timeTakenSeconds: number;
+  timestamp: number;
+  department: string;
+  subjectBreakdown: {
+    civil: { total: number; correct: number; wrong: number; score: number };
+    math: { total: number; correct: number; wrong: number; score: number };
+    physics: { total: number; correct: number; wrong: number; score: number };
+    chemistry: { total: number; correct: number; wrong: number; score: number };
+    english: { total: number; correct: number; wrong: number; score: number };
+  };
+  questionResults?: {
+    questionId: string;
+    question: string;
+    subject: SubjectType;
+    selectedOption: number | null;
+    correctOption: number;
+    options: string[];
+    isCorrect: boolean;
+    explanation?: string;
+  }[];
+}
+
+export interface DailyLimitInfo {
+  date: string; // YYYY-MM-DD
+  count: number; // 0 to 5
+}
+
+export interface StudySession {
+  id: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // "06:00" or "06:00 AM"
+  endTime: string; // "09:00" or "09:00 AM"
+  durationMinutes: number; // duration in minutes (e.g. 180 = 3h)
+  subject: string; // e.g. "Civil Engineering", "Math", "Physics", etc.
+  topic: string; // what was studied, e.g. "Surveying Chapter 3"
+  notes?: string;
+  createdAt: number;
+}
+
+export type AppView = 'home' | 'exam' | 'result' | 'import' | 'history' | 'ai_support' | 'profile' | 'study_time';
