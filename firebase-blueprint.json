@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with academic details and CGPA calculation",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Auth UID of the user" },
+        "name": { "type": "string", "description": "Student full name", "maxLength": 100 },
+        "email": { "type": "string", "description": "Student email address" },
+        "polytechnicRoll": { "type": "string", "description": "Polytechnic Board Roll number", "maxLength": 30 },
+        "polytechnicName": { "type": "string", "description": "Institute name", "maxLength": 120 },
+        "department": { "type": "string", "description": "Engineering department (civil, eee, me, cse)" },
+        "semesters": { "type": "object", "description": "Semester GPA grades (s1 to s8)" },
+        "calculatedCgpa": { "type": "number", "description": "Calculated CGPA score" },
+        "isAverage": { "type": "boolean", "description": "Whether CGPA calculation uses straight average or BTEB weights" },
+        "completedOnboarding": { "type": "boolean", "description": "Whether onboarding profile is completed" },
+        "createdAt": { "type": "number", "description": "Profile creation timestamp" },
+        "updatedAt": { "type": "number", "description": "Last updated timestamp" }
+      },
+      "required": ["userId", "name", "polytechnicRoll", "polytechnicName", "department", "completedOnboarding"]
+    },
+    "CustomQuestion": {
+      "title": "CustomQuestion",
+      "description": "Custom imported quiz questions for DUET admission practice",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of the question" },
+        "userId": { "type": "string", "description": "Auth UID of creator" },
+        "subject": { "type": "string", "description": "Subject: civil, english, math, physics, chemistry" },
+        "category": { "type": "string", "description": "department or non_department" },
+        "department": { "type": "string", "description": "Target engineering department" },
+        "questionBn": { "type": "string", "description": "Question text in Bengali", "maxLength": 1000 },
+        "questionEn": { "type": "string", "description": "Question text in English (optional)", "maxLength": 1000 },
+        "optionsBn": { "type": "array", "description": "List of 4 choices in Bengali" },
+        "correctAnswer": { "type": "number", "description": "Zero-indexed correct option (0-3)" },
+        "explanationBn": { "type": "string", "description": "Explanation of correct answer", "maxLength": 2000 },
+        "createdAt": { "type": "number", "description": "Creation timestamp" }
+      },
+      "required": ["id", "userId", "subject", "category", "questionBn", "optionsBn", "correctAnswer"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "DUET model test and quiz exam results",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Result identifier" },
+        "userId": { "type": "string", "description": "Auth UID of user" },
+        "quizName": { "type": "string", "description": "Name of the quiz" },
+        "score": { "type": "number", "description": "Final score earned" },
+        "totalMarks": { "type": "number", "description": "Total marks possible" },
+        "correctCount": { "type": "number", "description": "Total correct answers" },
+        "wrongCount": { "type": "number", "description": "Total incorrect answers" },
+        "skippedCount": { "type": "number", "description": "Total skipped questions" },
+        "totalQuestions": { "type": "number", "description": "Number of questions in test" },
+        "percentage": { "type": "number", "description": "Percentage score" },
+        "timeTakenSeconds": { "type": "number", "description": "Time elapsed in seconds" },
+        "timestamp": { "type": "number", "description": "Exam finish timestamp" },
+        "department": { "type": "string", "description": "Target department" }
+      },
+      "required": ["id", "userId", "quizName", "score", "totalMarks", "correctCount", "wrongCount", "timestamp"]
+    },
+    "StudySession": {
+      "title": "StudySession",
+      "description": "Daily logged study tracker session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Session identifier" },
+        "userId": { "type": "string", "description": "Auth UID of student" },
+        "date": { "type": "string", "description": "Date in YYYY-MM-DD format" },
+        "startTime": { "type": "string", "description": "Session start time" },
+        "endTime": { "type": "string", "description": "Session end time" },
+        "durationMinutes": { "type": "number", "description": "Total duration in minutes" },
+        "subject": { "type": "string", "description": "Subject studied" },
+        "topic": { "type": "string", "description": "Specific topic or chapter studied" },
+        "notes": { "type": "string", "description": "Optional notes or remarks" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" }
+      },
+      "required": ["id", "userId", "date", "startTime", "endTime", "durationMinutes", "subject", "topic"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profile and CGPA calculations for DUET admission applicants"
+    },
+    "/users/{userId}/custom_questions/{questionId}": {
+      "schema": { "$ref": "#/entities/CustomQuestion" },
+      "description": "Stores imported and customized quiz questions created by the user"
+    },
+    "/users/{userId}/quiz_results/{resultId}": {
+      "schema": { "$ref": "#/entities/QuizResult" },
+      "description": "Stores model test and quiz history results for the user"
+    },
+    "/users/{userId}/study_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/StudySession" },
+      "description": "Stores daily study routine tracker sessions"
+    }
+  }
+}

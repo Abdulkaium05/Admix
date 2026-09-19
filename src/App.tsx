@@ -10,8 +10,19 @@ import {
   saveQuizResult,
   getAllQuestions,
   getCustomQuestions,
+  saveBatchCustomQuestions,
   MAX_DAILY_EXAMS,
 } from './utils/storage';
+import {
+  auth,
+  logoutUser,
+  getUserProfileFromCloud,
+  saveUserProfileToCloud,
+  getCustomQuestionsFromCloud,
+  saveQuizResultToCloud,
+  getQuizHistoryFromCloud,
+} from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 import { Header } from './components/Header';
 import { MoreMenuDrawer } from './components/MoreMenuDrawer';
@@ -24,6 +35,8 @@ import { AiSupportScreen } from './components/AiSupportScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { StudyTimeScreen } from './components/StudyTimeScreen';
 import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
+import { AuthScreen } from './components/AuthScreen';
+import { EngineerLogo } from './components/EngineerLogo';
 
 export default function App() {
   // 1. Language State (Theme is permanently White & Light Green)
@@ -39,26 +52,104 @@ export default function App() {
     setLanguage((prev) => (prev === 'bn' ? 'en' : 'bn'));
   };
 
-  // 2. User Profile State
+  // 2. Firebase Authentication State
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+
+  // 3. User Profile State
   const [profile, setProfile] = useState<UserProfile | null>(() => getUserProfile());
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !getUserProfile());
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false);
   const [isCountdownModalOpen, setIsCountdownModalOpen] = useState<boolean>(false);
 
-  // 3. Navigation View State
+  // 4. Navigation View State
   const [currentView, setCurrentView] = useState<AppView>('home');
 
-  // 4. Data State
+  // 5. Data State
   const [dailyLimit, setDailyLimit] = useState<DailyLimitInfo>(() => getDailyLimitInfo());
   const [history, setHistory] = useState<QuizResult[]>(() => getQuizHistory());
   const [allQuestions, setAllQuestions] = useState<Question[]>(() => getAllQuestions());
   const [customQuestions, setCustomQuestions] = useState<Question[]>(() => getCustomQuestions());
 
-  // 5. Active Exam State
+  // 6. Active Exam State
   const [activeExamQuestions, setActiveExamQuestions] = useState<Question[]>([]);
   const [latestResult, setLatestResult] = useState<QuizResult | null>(null);
 
-  // Reload questions from storage
+  // Function to reload questions and sync with Firestore
+  const syncCloudQuestions = useCallback(async (userId?: string) => {
+    const uid = userId || firebaseUser?.uid;
+    if (!uid) {
+      setAllQuestions(getAllQuestions());
+      setCustomQuestions(getCustomQuestions());
+      return;
+    }
+
+    try {
+      const cloudCustom = await getCustomQuestionsFromCloud(uid);
+      if (cloudCustom && cloudCustom.length > 0) {
+        // Merge cloud questions into local storage cache
+        saveBatchCustomQuestions(cloudCustom);
+      }
+      setAllQuestions(getAllQuestions());
+      setCustomQuestions(getCustomQuestions());
+    } catch (err) {
+      console.error('Failed to sync cloud questions:', err);
+      // Fallback to local storage
+      setAllQuestions(getAllQuestions());
+      setCustomQuestions(getCustomQuestions());
+    }
+  }, [firebaseUser]);
+
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        // User is logged in, attempt to fetch profile from Firestore
+        try {
+          const cloudProfile = await getUserProfileFromCloud(user.uid);
+          if (cloudProfile && cloudProfile.completedOnboarding) {
+            setProfile(cloudProfile);
+            saveUserProfile(cloudProfile);
+            setIsOnboardingOpen(false);
+          } else {
+            // Profile doesn't exist yet in cloud (New User) -> Open Onboarding Profile Modal
+            const localProf = getUserProfile();
+            if (localProf && localProf.completedOnboarding) {
+              setProfile(localProf);
+              // Save to cloud
+              await saveUserProfileToCloud(user.uid, localProf);
+              setIsOnboardingOpen(false);
+            } else {
+              setIsOnboardingOpen(true);
+            }
+          }
+
+          // Fetch cloud questions
+          await syncCloudQuestions(user.uid);
+
+          // Fetch quiz history from cloud
+          try {
+            const cloudHistory = await getQuizHistoryFromCloud(user.uid);
+            if (cloudHistory && cloudHistory.length > 0) {
+              setHistory(cloudHistory);
+            }
+          } catch (e) {
+            console.error('History load error:', e);
+          }
+        } catch (e) {
+          console.error('Error loading cloud user data:', e);
+        }
+      } else {
+        setProfile(null);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [syncCloudQuestions]);
+
+  // Refresh questions from storage
   const refreshQuestions = useCallback(() => {
     setAllQuestions(getAllQuestions());
     setCustomQuestions(getCustomQuestions());
@@ -68,11 +159,30 @@ export default function App() {
     setHistory(getQuizHistory());
   }, []);
 
-  // Profile Save Handler
-  const handleSaveProfile = (newProfile: UserProfile) => {
+  // Profile Save Handler: Saves to Local Storage AND Firestore
+  const handleSaveProfile = async (newProfile: UserProfile) => {
     saveUserProfile(newProfile);
     setProfile(newProfile);
     setIsOnboardingOpen(false);
+
+    if (firebaseUser) {
+      try {
+        await saveUserProfileToCloud(firebaseUser.uid, newProfile);
+      } catch (err) {
+        console.error('Failed to sync profile to cloud:', err);
+      }
+    }
+  };
+
+  // Logout Handler
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      setProfile(null);
+      setCurrentView('home');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
   /**
@@ -137,6 +247,11 @@ export default function App() {
   // Exam Finish Handler
   const handleFinishExam = (result: QuizResult) => {
     saveQuizResult(result);
+    if (firebaseUser) {
+      saveQuizResultToCloud(firebaseUser.uid, result).catch((err) =>
+        console.error('Failed to save quiz result to cloud:', err)
+      );
+    }
     const updatedLimit = incrementDailyQuizCount();
     setDailyLimit(updatedLimit);
     refreshHistory();
@@ -150,6 +265,33 @@ export default function App() {
       setCurrentView('home');
     }
   };
+
+  // Auth Loading Screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#f0fdf4] flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 bg-white rounded-2xl shadow-md border border-emerald-200 p-2.5 mb-4 animate-bounce">
+          <EngineerLogo className="w-full h-full text-emerald-700" />
+        </div>
+        <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2" />
+        <p className="text-xs font-bold text-emerald-800">
+          {language === 'bn' ? 'ডাটাবেস লোড হচ্ছে...' : 'Connecting to database...'}
+        </p>
+      </div>
+    );
+  }
+
+  // Not Logged In: Show Auth Screen (Sign Up / Login)
+  if (!firebaseUser) {
+    return (
+      <AuthScreen
+        language={language}
+        onSuccess={() => {
+          // auth listener handles transition
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f0fdf4] text-emerald-950 font-['Hind_Siliguri',sans-serif]">
@@ -203,6 +345,8 @@ export default function App() {
             customQuestions={customQuestions}
             language={language}
             onRefreshQuestions={refreshQuestions}
+            userId={firebaseUser.uid}
+            onSyncCloud={() => syncCloudQuestions(firebaseUser.uid)}
           />
         )}
 
@@ -235,13 +379,13 @@ export default function App() {
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1.5">
             <p>Admix • ডুয়েট ভর্তি প্রস্তুতি ও মডেল টেস্ট</p>
             <p className="font-semibold text-emerald-700">
-              সাদা ও হালকা সবুজ থিম • অফলাইন বান্ধব
+              ফায়ারবেস ক্লাউড ডাটাবেস সংযুক্ত • যেকোনো ডিভাইস সিঙ্ক
             </p>
           </div>
         </footer>
       )}
 
-      {/* Side More Menu Drawer with Language Setting */}
+      {/* Side More Menu Drawer with Language Setting & Account details */}
       <MoreMenuDrawer
         isOpen={isMoreMenuOpen}
         onClose={() => setIsMoreMenuOpen(false)}
@@ -253,6 +397,8 @@ export default function App() {
         onOpenProfileModal={() => setIsOnboardingOpen(true)}
         onOpenCountdownModal={() => setIsCountdownModalOpen(true)}
         questionCount={allQuestions.length}
+        userEmail={firebaseUser.email}
+        onLogout={handleLogout}
       />
 
       {/* Admission Countdown Modal */}
@@ -268,8 +414,12 @@ export default function App() {
         onSave={handleSaveProfile}
         initialProfile={profile}
         language={language}
-        canCloseWithoutSave={profile !== null}
-        onClose={() => setIsOnboardingOpen(false)}
+        canCloseWithoutSave={profile !== null && profile.completedOnboarding}
+        onClose={() => {
+          if (profile !== null && profile.completedOnboarding) {
+            setIsOnboardingOpen(false);
+          }
+        }}
       />
     </div>
   );

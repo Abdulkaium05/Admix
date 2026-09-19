@@ -101,9 +101,9 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
         </div>
       ) : (
         <div className="space-y-3">
-          {history.map((item) => (
+          {history.map((item, idx) => (
             <div
-              key={item.id}
+              key={item.id ? `${item.id}-${idx}` : `hist-${idx}`}
               onClick={() => onSelectResult(item)}
               className="group p-4 sm:p-5 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between gap-4"
             >

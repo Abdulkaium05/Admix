@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { UserProfile, SemesterGrades } from '../types';
+import { UserProfile, SemesterGrades, DepartmentType } from '../types';
 import { calculateCgpa } from '../utils/storage';
 import { translations, Language } from '../utils/i18n';
 import { EngineerLogo } from './EngineerLogo';
-import { Calculator, CheckCircle2, AlertCircle, Sparkles, X } from 'lucide-react';
+import { Calculator, CheckCircle2, AlertCircle, Sparkles, X, Building2 } from 'lucide-react';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [name, setName] = useState(initialProfile?.name || '');
   const [polytechnicRoll, setPolytechnicRoll] = useState(initialProfile?.polytechnicRoll || '');
   const [polytechnicName, setPolytechnicName] = useState(initialProfile?.polytechnicName || '');
+  const [department, setDepartment] = useState<DepartmentType>(initialProfile?.department || 'civil');
 
   const [semesters, setSemesters] = useState<SemesterGrades>(
     initialProfile?.semesters || {
@@ -82,7 +83,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       semesters,
       calculatedCgpa: cgpaResult.cgpa,
       isAverage: cgpaResult.isAverage,
-      department: 'civil',
+      department,
       completedOnboarding: true,
     };
 
@@ -190,6 +191,35 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   placeholder="যেমন: ঢাকা পলিটেকনিক"
                   className="w-full px-3 py-2 rounded-xl border border-emerald-200 bg-white text-emerald-950 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
+              </div>
+            </div>
+
+            {/* Department Selection */}
+            <div>
+              <label className="block text-xs font-bold text-emerald-950 mb-1.5 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{language === 'bn' ? 'টার্গেট প্রকৌশল বিভাগ (ডিপার্টমেন্ট)' : 'Target Engineering Department'}</span>
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: 'civil' as DepartmentType, labelBn: 'সিভিল (Civil)', labelEn: 'Civil' },
+                  { id: 'eee' as DepartmentType, labelBn: 'ইইই (EEE)', labelEn: 'EEE' },
+                  { id: 'me' as DepartmentType, labelBn: 'মেকানিক্যাল (ME)', labelEn: 'Mechanical' },
+                  { id: 'cse' as DepartmentType, labelBn: 'সিএসই (CSE)', labelEn: 'CSE' },
+                ].map((dept) => (
+                  <button
+                    key={dept.id}
+                    type="button"
+                    onClick={() => setDepartment(dept.id)}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all text-center ${
+                      department === dept.id
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                        : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {language === 'bn' ? dept.labelBn : dept.labelEn}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

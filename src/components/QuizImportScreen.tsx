@@ -7,6 +7,11 @@ import {
   saveBatchCustomQuestions,
 } from '../utils/storage';
 import {
+  saveCustomQuestionToCloud,
+  deleteCustomQuestionFromCloud,
+  saveBatchCustomQuestionsToCloud,
+} from '../firebase';
+import {
   PlusCircle,
   AlertTriangle,
   CheckCircle2,
@@ -16,6 +21,9 @@ import {
   ListPlus,
   HelpCircle,
   Tag,
+  Cloud,
+  CloudCheck,
+  RefreshCw,
 } from 'lucide-react';
 
 interface QuizImportScreenProps {
@@ -23,6 +31,8 @@ interface QuizImportScreenProps {
   language: Language;
   onRefreshQuestions: () => void;
   customQuestions: Question[];
+  userId?: string;
+  onSyncCloud?: () => Promise<void>;
 }
 
 export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
@@ -30,6 +40,8 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
   language,
   onRefreshQuestions,
   customQuestions,
+  userId,
+  onSyncCloud,
 }) => {
   const t = translations[language];
 
@@ -37,6 +49,7 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
   const [categoryType, setCategoryType] = useState<'department' | 'non_department'>('department');
   const [selectedSubject, setSelectedSubject] = useState<SubjectType>('civil');
   const [department, setDepartment] = useState<DepartmentType>('civil');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Question & Options inputs
   const [questionBn, setQuestionBn] = useState('');
@@ -151,9 +164,9 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
     setErrors([]);
 
     const newQuestion: Question = {
-      id: `custom-q-${Date.now()}`,
+      id: `custom-q-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
       category: categoryType,
-      department: 'civil',
+      department: department,
       subject: selectedSubject,
       questionBn: questionBn.trim(),
       questionEn: questionEn.trim() || undefined,
@@ -161,9 +174,15 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
       correctAnswer: correctAnswer!,
       explanationBn: explanationBn.trim() || undefined,
       isCustom: true,
+      createdAt: Date.now(),
     };
 
     saveCustomQuestion(newQuestion);
+    if (userId) {
+      saveCustomQuestionToCloud(userId, newQuestion).catch((err) =>
+        console.error('Failed to save question to Firestore:', err)
+      );
+    }
     onRefreshQuestions();
 
     // Reset inputs
@@ -175,7 +194,11 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
     setOptionD('');
     setCorrectAnswer(null);
     setExplanationBn('');
-    setSuccessMessage(t.successQuestionAdded);
+    setSuccessMessage(
+      language === 'bn'
+        ? 'প্রশ্নটি সফলভাবে ডাটাবেসে সেভ হয়েছে! (অন্য ডিভাইসেও পাওয়া যাবে)'
+        : 'Question successfully saved to database! (Available on all devices)'
+    );
 
     // Auto-dismiss success alert after 4s
     setTimeout(() => {
@@ -185,11 +208,16 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
 
   const handleDelete = (id: string) => {
     deleteCustomQuestion(id);
+    if (userId) {
+      deleteCustomQuestionFromCloud(userId, id).catch((err) =>
+        console.error('Failed to delete question from Firestore:', err)
+      );
+    }
     onRefreshQuestions();
   };
 
   // Batch import handler
-  const handleBatchImport = () => {
+  const handleBatchImport = async () => {
     try {
       setBatchError(null);
       const parsed = JSON.parse(jsonInput);
@@ -206,7 +234,7 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
         formattedQuestions.push({
           id: `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           category: item.category || categoryType,
-          department: (item.department as DepartmentType) || 'civil',
+          department: (item.department as DepartmentType) || department,
           subject: item.subject || selectedSubject,
           questionBn: item.questionBn,
           questionEn: item.questionEn,
@@ -214,17 +242,21 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
           correctAnswer: typeof item.correctAnswer === 'number' ? item.correctAnswer : 0,
           explanationBn: item.explanationBn,
           isCustom: true,
+          createdAt: Date.now(),
         });
       }
 
       saveBatchCustomQuestions(formattedQuestions);
+      if (userId) {
+        await saveBatchCustomQuestionsToCloud(userId, formattedQuestions);
+      }
       onRefreshQuestions();
       setShowBatchModal(false);
       setJsonInput('');
       setSuccessMessage(
         language === 'bn'
-          ? `একসাথে ${formattedQuestions.length} টি প্রশ্ন সফলভাবে যুক্ত হয়েছে!`
-          : `Successfully imported ${formattedQuestions.length} questions!`
+          ? `একসাথে ${formattedQuestions.length} টি প্রশ্ন সফলভাবে ক্লাউড ডাটাবেসে যুক্ত হয়েছে!`
+          : `Successfully imported ${formattedQuestions.length} questions to cloud database!`
       );
     } catch (err: any) {
       setBatchError(err.message || 'Invalid JSON format.');
@@ -236,22 +268,48 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
       {/* 1. Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white border border-emerald-100 shadow-2xs">
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-emerald-950 flex items-center gap-2">
-            <PlusCircle className="w-5 h-5 text-emerald-600" />
-            <span>{t.importTitle}</span>
-          </h2>
-          <p className="text-xs text-emerald-700/80 mt-0.5">
-            {t.importSubtitle}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base sm:text-lg font-bold text-emerald-950 flex items-center gap-2">
+              <PlusCircle className="w-5 h-5 text-emerald-600" />
+              <span>{t.importTitle}</span>
+            </h2>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold border border-emerald-200">
+              <Cloud className="w-3 h-3 text-emerald-600" />
+              <span>{language === 'bn' ? 'ফায়ারবেস ক্লাউড সক্রিয়' : 'Firebase Cloud Active'}</span>
+            </span>
+          </div>
+          <p className="text-xs text-emerald-700/80 mt-1">
+            {language === 'bn'
+              ? 'এখানে যুক্ত করা সমস্ত প্রশ্ন ফায়ারবেস ডাটাবেসে সেভ হবে এবং যেকোনো ফোন বা কম্পিউটার থেকে এক্সেস করা যাবে।'
+              : 'All questions added here are saved to the Firebase database and accessible from any phone or computer.'}
           </p>
         </div>
 
-        <button
-          onClick={() => setShowBatchModal(true)}
-          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold hover:bg-emerald-100 transition-colors"
-        >
-          <Upload className="w-4 h-4 text-emerald-600" />
-          <span>{t.batchImportJson}</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onSyncCloud && (
+            <button
+              onClick={async () => {
+                setIsSyncing(true);
+                await onSyncCloud();
+                setIsSyncing(false);
+              }}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-900 text-xs font-semibold hover:bg-emerald-50 transition-colors shadow-2xs disabled:opacity-50"
+              title="অন্যান্য ফোন থেকে আসা প্রশ্ন সিঙ্ক করুন"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? (language === 'bn' ? 'সিঙ্ক হচ্ছে...' : 'Syncing...') : (language === 'bn' ? 'ক্লাউড সিঙ্ক' : 'Cloud Sync')}</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowBatchModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold hover:bg-emerald-100 transition-colors shadow-2xs"
+          >
+            <Upload className="w-4 h-4 text-emerald-600" />
+            <span>{t.batchImportJson}</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Success Banner */}
@@ -590,9 +648,9 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
           </div>
 
           <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-            {customQuestions.map((q) => (
+            {customQuestions.map((q, idx) => (
               <div
-                key={q.id}
+                key={q.id ? `${q.id}-${idx}` : `custom-${idx}`}
                 className="p-3.5 rounded-xl border border-emerald-100 bg-[#f0fdf4]/50 flex items-start justify-between gap-3"
               >
                 <div>

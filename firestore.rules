@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 120
+        && data.polytechnicRoll is string && data.polytechnicRoll.size() <= 50
+        && data.polytechnicName is string && data.polytechnicName.size() <= 150
+        && data.department is string
+        && data.completedOnboarding is bool;
+    }
+
+    function isValidQuestion(data, userId) {
+      return data.userId == userId
+        && data.id is string && data.id.size() > 0
+        && data.subject is string
+        && data.category is string
+        && data.questionBn is string && data.questionBn.size() > 0 && data.questionBn.size() <= 2000
+        && data.optionsBn is list && data.optionsBn.size() == 4
+        && data.correctAnswer is int && data.correctAnswer >= 0 && data.correctAnswer <= 3;
+    }
+
+    // Connection testing endpoint
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // User profile document
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Users cannot list other users
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data, userId);
+      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data, userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(userId);
+
+      // Custom imported questions belonging to user
+      match /custom_questions/{questionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidQuestion(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidQuestion(request.resource.data, userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Quiz and model test exam results
+      match /quiz_results/{resultId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Daily study routine sessions
+      match /study_sessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

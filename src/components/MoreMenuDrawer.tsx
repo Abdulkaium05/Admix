@@ -21,6 +21,8 @@ import {
   Sparkles,
   Clock,
   CalendarClock,
+  LogOut,
+  Cloud,
 } from 'lucide-react';
 
 interface MoreMenuDrawerProps {
@@ -34,6 +36,8 @@ interface MoreMenuDrawerProps {
   onOpenProfileModal: () => void;
   onOpenCountdownModal: () => void;
   questionCount: number;
+  userEmail?: string | null;
+  onLogout?: () => void;
 }
 
 export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
@@ -47,6 +51,8 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
   onOpenProfileModal,
   onOpenCountdownModal,
   questionCount,
+  userEmail,
+  onLogout,
 }) => {
   const t = translations[language];
   const todayMins = getTodayStudyMinutes();
@@ -282,6 +288,34 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
               </div>
             </div>
           </div>
+
+          {/* User Account & Logout */}
+          {userEmail && (
+            <div className="pt-3 my-2 border-t border-emerald-100">
+              <div className="px-3 py-2 rounded-xl bg-emerald-50/50 border border-emerald-100 mb-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-900">
+                  <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>ফায়ারবেস একাউন্ট</span>
+                </div>
+                <p className="text-[11px] text-emerald-700/80 truncate mt-0.5">
+                  {userEmail}
+                </p>
+              </div>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onLogout();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>{language === 'bn' ? 'লগআউট করুন' : 'Sign Out'}</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom App Note */}

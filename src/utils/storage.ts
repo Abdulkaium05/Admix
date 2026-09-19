@@ -127,7 +127,19 @@ export function getQuizHistory(): QuizResult[] {
   try {
     const data = localStorage.getItem(HISTORY_KEY);
     if (!data) return [];
-    return JSON.parse(data);
+    const parsed: QuizResult[] = JSON.parse(data);
+    const seen = new Set<string>();
+    const unique: QuizResult[] = [];
+    for (const item of parsed) {
+      if (item && item.id && !seen.has(item.id)) {
+        seen.add(item.id);
+        unique.push(item);
+      }
+    }
+    if (unique.length !== parsed.length) {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(unique));
+    }
+    return unique;
   } catch (e) {
     console.error('Failed to load quiz history', e);
     return [];
@@ -136,7 +148,7 @@ export function getQuizHistory(): QuizResult[] {
 
 export function saveQuizResult(result: QuizResult): void {
   try {
-    const history = getQuizHistory();
+    const history = getQuizHistory().filter((h) => h.id !== result.id);
     history.unshift(result);
     // Keep last 50 results
     if (history.length > 50) history.length = 50;
@@ -157,10 +169,16 @@ export function clearQuizHistory(): void {
 // Question Bank Management
 export function getAllQuestions(): Question[] {
   try {
-    const customData = localStorage.getItem(CUSTOM_QUESTIONS_KEY);
-    const customList: Question[] = customData ? JSON.parse(customData) : [];
-    // Merge default questions with custom questions
-    return [...defaultQuestions, ...customList];
+    const customList = getCustomQuestions();
+    // Merge default questions with custom questions, deduplicating by ID
+    const map = new Map<string, Question>();
+    for (const q of defaultQuestions) {
+      if (q && q.id) map.set(q.id, q);
+    }
+    for (const q of customList) {
+      if (q && q.id) map.set(q.id, q);
+    }
+    return Array.from(map.values());
   } catch (e) {
     console.error('Failed to load questions', e);
     return defaultQuestions;
@@ -170,7 +188,21 @@ export function getAllQuestions(): Question[] {
 export function getCustomQuestions(): Question[] {
   try {
     const customData = localStorage.getItem(CUSTOM_QUESTIONS_KEY);
-    return customData ? JSON.parse(customData) : [];
+    if (!customData) return [];
+    const parsed: Question[] = JSON.parse(customData);
+    const seen = new Set<string>();
+    const unique: Question[] = [];
+    for (const q of parsed) {
+      if (q && q.id && !seen.has(q.id)) {
+        seen.add(q.id);
+        unique.push(q);
+      }
+    }
+    // Auto-clean duplicates in localStorage if any were found
+    if (unique.length !== parsed.length) {
+      localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(unique));
+    }
+    return unique;
   } catch (e) {
     return [];
   }
@@ -179,8 +211,16 @@ export function getCustomQuestions(): Question[] {
 export function saveCustomQuestion(question: Question): void {
   try {
     const list = getCustomQuestions();
-    list.unshift(question);
-    localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(list));
+    const map = new Map<string, Question>();
+    // Put newest/updated question first
+    map.set(question.id, question);
+    for (const q of list) {
+      if (q && q.id && !map.has(q.id)) {
+        map.set(q.id, q);
+      }
+    }
+    const updated = Array.from(map.values());
+    localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(updated));
   } catch (e) {
     console.error('Failed to save custom question', e);
   }
@@ -189,7 +229,16 @@ export function saveCustomQuestion(question: Question): void {
 export function saveBatchCustomQuestions(questions: Question[]): void {
   try {
     const list = getCustomQuestions();
-    const updated = [...questions, ...list];
+    const map = new Map<string, Question>();
+    // Existing questions
+    for (const q of list) {
+      if (q && q.id) map.set(q.id, q);
+    }
+    // Incoming questions overwrite or add
+    for (const q of questions) {
+      if (q && q.id) map.set(q.id, q);
+    }
+    const updated = Array.from(map.values());
     localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(updated));
   } catch (e) {
     console.error('Failed to batch save questions', e);
@@ -243,8 +292,19 @@ export function getStudySessions(): StudySession[] {
       return sampleSessions;
     }
     const parsed: StudySession[] = JSON.parse(data);
+    const seen = new Set<string>();
+    const unique: StudySession[] = [];
+    for (const s of parsed) {
+      if (s && s.id && !seen.has(s.id)) {
+        seen.add(s.id);
+        unique.push(s);
+      }
+    }
+    if (unique.length !== parsed.length) {
+      localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(unique));
+    }
     // Sort descending by date then createdAt
-    return parsed.sort((a, b) => {
+    return unique.sort((a, b) => {
       if (b.date !== a.date) {
         return b.date.localeCompare(a.date);
       }
@@ -258,7 +318,7 @@ export function getStudySessions(): StudySession[] {
 
 export function saveStudySession(session: StudySession): void {
   try {
-    const list = getStudySessions();
+    const list = getStudySessions().filter((s) => s.id !== session.id);
     // Prepend new session
     list.unshift(session);
     localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(list));

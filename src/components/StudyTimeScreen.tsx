@@ -820,7 +820,7 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
             <div className="space-y-3">
               {selectedDateSessions.map((item, idx) => (
                 <div
-                  key={item.id || idx}
+                  key={item.id ? `${item.id}-${idx}` : `sess-${idx}`}
                   className="p-3.5 sm:p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors flex items-start justify-between gap-3"
                 >
                   <div className="space-y-1.5">
@@ -954,9 +954,9 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
 
                   {/* Day Sessions List */}
                   <div className="divide-y divide-emerald-50 p-2 sm:p-3 space-y-2">
-                    {daySessions.map((session) => (
+                    {daySessions.map((session, sIdx) => (
                       <div
-                        key={session.id}
+                        key={session.id ? `${session.id}-${sIdx}` : `day-sess-${sIdx}`}
                         className="p-3 rounded-xl hover:bg-emerald-50/30 transition-colors flex items-start justify-between gap-2"
                       >
                         <div className="space-y-1">

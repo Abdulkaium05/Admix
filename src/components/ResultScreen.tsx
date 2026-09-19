@@ -265,7 +265,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
             return (
               <div
-                key={item.questionId || idx}
+                key={item.questionId ? `${item.questionId}-${idx}` : `res-${idx}`}
                 className={`p-3.5 rounded-xl border transition-all ${
                   item.isCorrect
                     ? 'border-emerald-200 bg-emerald-50/40'
