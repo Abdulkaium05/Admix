@@ -7,6 +7,7 @@ import {
   saveBatchCustomQuestions,
 } from '../utils/storage';
 import {
+  auth,
   saveCustomQuestionToCloud,
   deleteCustomQuestionFromCloud,
   saveBatchCustomQuestionsToCloud,
@@ -24,6 +25,7 @@ import {
   Cloud,
   CloudCheck,
   RefreshCw,
+  LogIn,
 } from 'lucide-react';
 
 interface QuizImportScreenProps {
@@ -32,6 +34,7 @@ interface QuizImportScreenProps {
   onRefreshQuestions: () => void;
   customQuestions: Question[];
   userId?: string;
+  onOpenAuth?: () => void;
   onSyncCloud?: () => Promise<void>;
 }
 
@@ -41,6 +44,7 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
   onRefreshQuestions,
   customQuestions,
   userId,
+  onOpenAuth,
   onSyncCloud,
 }) => {
   const t = translations[language];
@@ -50,6 +54,11 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
   const [selectedSubject, setSelectedSubject] = useState<SubjectType>('civil');
   const [department, setDepartment] = useState<DepartmentType>('civil');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isBatchImporting, setIsBatchImporting] = useState(false);
+
+  // Active User ID for Cloud Storage operations
+  const activeUserId = userId || auth.currentUser?.uid;
 
   // Question & Options inputs
   const [questionBn, setQuestionBn] = useState('');
@@ -149,7 +158,7 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
     return errList;
   };
 
-  const handleSaveQuestion = (e: React.FormEvent) => {
+  const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     const validationErrors = validateForm();
 
@@ -162,6 +171,7 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
     }
 
     setErrors([]);
+    setIsSaving(true);
 
     const newQuestion: Question = {
       id: `custom-q-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
@@ -177,89 +187,196 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
       createdAt: Date.now(),
     };
 
-    saveCustomQuestion(newQuestion);
-    if (userId) {
-      saveCustomQuestionToCloud(userId, newQuestion).catch((err) =>
-        console.error('Failed to save question to Firestore:', err)
-      );
+    try {
+      // 1. Always save locally immediately
+      saveCustomQuestion(newQuestion);
+
+      // 2. Save to Cloud Firestore if user is authenticated
+      if (activeUserId) {
+        const cloudRes = await saveCustomQuestionToCloud(activeUserId, newQuestion);
+        if (cloudRes.success) {
+          setSuccessMessage(
+            language === 'bn'
+              ? 'প্রশ্নটি সফলভাবে ফায়ারবেস ক্লাউড ডাটাবেস ও এই ডিভাইসে সংরক্ষিত হয়েছে!'
+              : 'Question successfully saved to Firebase Cloud Database and local storage!'
+          );
+        } else {
+          setSuccessMessage(
+            language === 'bn'
+              ? `প্রশ্নটি ডিভাইসে সেভ হয়েছে, কিন্তু ক্লাউড ডাটাবেস সতর্কবার্তা: ${cloudRes.error}`
+              : `Saved locally, but cloud warning: ${cloudRes.error}`
+          );
+        }
+      } else {
+        setSuccessMessage(
+          language === 'bn'
+            ? 'প্রশ্নটি আপনার ডিভাইসের লোকাল মেমরিতে সেভ হয়েছে। ক্লাউড ডাটাবেসে সেভ করতে অনুগ্রহ করে লগইন করুন।'
+            : 'Question saved to local device. Please sign in to sync with cloud database.'
+        );
+      }
+
+      onRefreshQuestions();
+
+      // Reset inputs
+      setQuestionBn('');
+      setQuestionEn('');
+      setOptionA('');
+      setOptionB('');
+      setOptionC('');
+      setOptionD('');
+      setCorrectAnswer(null);
+      setExplanationBn('');
+    } catch (err: any) {
+      console.error('Save question error:', err);
+      setErrors([err?.message || 'Failed to save question']);
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 5000);
     }
-    onRefreshQuestions();
-
-    // Reset inputs
-    setQuestionBn('');
-    setQuestionEn('');
-    setOptionA('');
-    setOptionB('');
-    setOptionC('');
-    setOptionD('');
-    setCorrectAnswer(null);
-    setExplanationBn('');
-    setSuccessMessage(
-      language === 'bn'
-        ? 'প্রশ্নটি সফলভাবে ডাটাবেসে সেভ হয়েছে! (অন্য ডিভাইসেও পাওয়া যাবে)'
-        : 'Question successfully saved to database! (Available on all devices)'
-    );
-
-    // Auto-dismiss success alert after 4s
-    setTimeout(() => {
-      setSuccessMessage(null);
-    }, 4000);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     deleteCustomQuestion(id);
-    if (userId) {
-      deleteCustomQuestionFromCloud(userId, id).catch((err) =>
-        console.error('Failed to delete question from Firestore:', err)
-      );
+    if (activeUserId) {
+      await deleteCustomQuestionFromCloud(activeUserId, id);
     }
     onRefreshQuestions();
   };
 
-  // Batch import handler
+  // Batch import handler with flexible parsing and cloud batch save
   const handleBatchImport = async () => {
     try {
       setBatchError(null);
-      const parsed = JSON.parse(jsonInput);
+      setIsBatchImporting(true);
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(jsonInput);
+      } catch {
+        throw new Error(
+          language === 'bn'
+            ? 'ভুল JSON ফরম্যাট! অনুগ্রহ করে সঠিক JSON কোড পেস্ট করুন।'
+            : 'Invalid JSON format. Please paste valid JSON.'
+        );
+      }
+
       if (!Array.isArray(parsed)) {
-        setBatchError('JSON must be an array of questions.');
-        return;
+        throw new Error(
+          language === 'bn'
+            ? 'JSON অবশ্যই একটি অ্যারে (Array [...]) হতে হবে।'
+            : 'JSON must be an array of questions.'
+        );
+      }
+
+      if (parsed.length === 0) {
+        throw new Error(
+          language === 'bn'
+            ? 'অ্যারেতে কোনো প্রশ্ন পাওয়া যায়নি।'
+            : 'No questions found in the JSON array.'
+        );
       }
 
       const formattedQuestions: Question[] = [];
-      for (const item of parsed) {
-        if (!item.questionBn || !Array.isArray(item.optionsBn) || item.optionsBn.length !== 4) {
-          throw new Error('Every question must have questionBn and 4 optionsBn.');
+
+      for (let i = 0; i < parsed.length; i++) {
+        const item = parsed[i];
+        if (!item || typeof item !== 'object') continue;
+
+        const qBn = item.questionBn || item.question || item.title || item.questionText;
+        if (!qBn || typeof qBn !== 'string' || !qBn.trim()) {
+          throw new Error(
+            language === 'bn'
+              ? `প্রশ্ন নং ${i + 1}-এ কোনো প্রশ্নের বিবরণ (questionBn) নেই।`
+              : `Question #${i + 1} is missing questionBn.`
+          );
         }
+
+        const rawOptions = item.optionsBn || item.options || item.choices;
+        if (!Array.isArray(rawOptions) || rawOptions.length !== 4) {
+          throw new Error(
+            language === 'bn'
+              ? `প্রশ্ন নং ${i + 1}-এ অবশ্যই ঠিক ৪টি অপশন (optionsBn) থাকতে হবে।`
+              : `Question #${i + 1} must have exactly 4 options in optionsBn.`
+          );
+        }
+
+        const cleanOptions = rawOptions.map((o) => String(o || '').trim());
+        if (cleanOptions.some((o) => !o)) {
+          throw new Error(
+            language === 'bn'
+              ? `প্রশ্ন নং ${i + 1}-এ কোনো অপশন ফাঁকা রাখা যাবে না।`
+              : `Question #${i + 1} has empty options.`
+          );
+        }
+
+        // Correct Answer normalization
+        let ansIdx = 0;
+        const rawAns = item.correctAnswer ?? item.answer ?? item.correct;
+        if (typeof rawAns === 'number' && rawAns >= 0 && rawAns <= 3) {
+          ansIdx = Math.floor(rawAns);
+        } else if (typeof rawAns === 'string') {
+          const trimmed = rawAns.trim().toUpperCase();
+          if (trimmed === 'A' || trimmed === 'ক' || trimmed === '0') ansIdx = 0;
+          else if (trimmed === 'B' || trimmed === 'খ' || trimmed === '1') ansIdx = 1;
+          else if (trimmed === 'C' || trimmed === 'গ' || trimmed === '2') ansIdx = 2;
+          else if (trimmed === 'D' || trimmed === 'ঘ' || trimmed === '3') ansIdx = 3;
+          else {
+            const foundIdx = cleanOptions.indexOf(rawAns.trim());
+            if (foundIdx !== -1) ansIdx = foundIdx;
+          }
+        }
+
         formattedQuestions.push({
-          id: `batch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          category: item.category || categoryType,
+          id: `batch-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`,
+          category: item.category === 'non_department' ? 'non_department' : categoryType,
           department: (item.department as DepartmentType) || department,
-          subject: item.subject || selectedSubject,
-          questionBn: item.questionBn,
-          questionEn: item.questionEn,
-          optionsBn: item.optionsBn,
-          correctAnswer: typeof item.correctAnswer === 'number' ? item.correctAnswer : 0,
-          explanationBn: item.explanationBn,
+          subject: (item.subject as SubjectType) || selectedSubject,
+          questionBn: qBn.trim(),
+          questionEn: item.questionEn || item.question_en || '',
+          optionsBn: [cleanOptions[0], cleanOptions[1], cleanOptions[2], cleanOptions[3]],
+          correctAnswer: ansIdx,
+          explanationBn: item.explanationBn || item.explanation || '',
           isCustom: true,
           createdAt: Date.now(),
         });
       }
 
+      // Save locally
       saveBatchCustomQuestions(formattedQuestions);
-      if (userId) {
-        await saveBatchCustomQuestionsToCloud(userId, formattedQuestions);
+
+      // Save to Cloud Firestore
+      if (activeUserId) {
+        const cloudRes = await saveBatchCustomQuestionsToCloud(activeUserId, formattedQuestions);
+        if (cloudRes.success) {
+          setSuccessMessage(
+            language === 'bn'
+              ? `একসাথে ${formattedQuestions.length} টি প্রশ্ন সফলভাবে ক্লাউড ডাটাবেস ও এই ডিভাইসে যুক্ত হয়েছে!`
+              : `Successfully imported ${formattedQuestions.length} questions to Firebase Cloud Database!`
+          );
+        } else {
+          setSuccessMessage(
+            language === 'bn'
+              ? `${formattedQuestions.length} টি প্রশ্ন ডিভাইসে যুক্ত হয়েছে, কিন্তু ক্লাউড সমস্যা: ${cloudRes.error}`
+              : `${formattedQuestions.length} questions imported locally, cloud error: ${cloudRes.error}`
+          );
+        }
+      } else {
+        setSuccessMessage(
+          language === 'bn'
+            ? `${formattedQuestions.length} টি প্রশ্ন লোকাল ডিভাইসে সফলভাবে ইমপোর্ট হয়েছে। ক্লাউড ডাটাবেসে ব্যাকআপ রাখতে দয়া করে লগইন করুন।`
+            : `${formattedQuestions.length} questions imported locally. Sign in to sync with cloud database.`
+        );
       }
+
       onRefreshQuestions();
       setShowBatchModal(false);
       setJsonInput('');
-      setSuccessMessage(
-        language === 'bn'
-          ? `একসাথে ${formattedQuestions.length} টি প্রশ্ন সফলভাবে ক্লাউড ডাটাবেসে যুক্ত হয়েছে!`
-          : `Successfully imported ${formattedQuestions.length} questions to cloud database!`
-      );
     } catch (err: any) {
       setBatchError(err.message || 'Invalid JSON format.');
+    } finally {
+      setIsBatchImporting(false);
     }
   };
 
@@ -273,10 +390,17 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
               <PlusCircle className="w-5 h-5 text-emerald-600" />
               <span>{t.importTitle}</span>
             </h2>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold border border-emerald-200">
-              <Cloud className="w-3 h-3 text-emerald-600" />
-              <span>{language === 'bn' ? 'ফায়ারবেস ক্লাউড সক্রিয়' : 'Firebase Cloud Active'}</span>
-            </span>
+            {activeUserId ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold border border-emerald-200">
+                <CloudCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{language === 'bn' ? 'ফায়ারবেস ক্লাউড সক্রিয় (সংযুক্ত)' : 'Firebase Cloud Active (Connected)'}</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold border border-amber-200">
+                <Cloud className="w-3.5 h-3.5 text-amber-600" />
+                <span>{language === 'bn' ? 'গেস্ট মোড (লগইন করা নেই)' : 'Guest Mode (Not Signed In)'}</span>
+              </span>
+            )}
           </div>
           <p className="text-xs text-emerald-700/80 mt-1">
             {language === 'bn'
@@ -311,6 +435,35 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Guest Mode Notice */}
+      {!activeUserId && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs shadow-2xs">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-900">
+                {language === 'bn' ? 'ক্লাউড ডাটাবেস এ সংরক্ষণের জন্য সাইন ইন প্রয়োজন' : 'Sign In Required for Cloud Database'}
+              </p>
+              <p className="text-amber-800/90 text-[11px] mt-0.5">
+                {language === 'bn'
+                  ? 'আপনি বর্তমানে গেস্ট মোডে আছেন। এখন প্রশ্ন সেভ করলে তা শুধু আপনার ব্রাউজারে থাকবে। ফায়ারবেস ক্লাউড ডাটাবেসে সেভ করতে এবং যেকোনো ফোন থেকে এক্সেস করতে অনুগ্রহ করে সাইন ইন করুন।'
+                  : 'You are currently in guest mode. Questions will only be saved in this browser. Sign in to save to Firebase Cloud Database.'}
+              </p>
+            </div>
+          </div>
+          {onOpenAuth && (
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'লগইন করুন' : 'Sign In'}</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 2. Success Banner */}
       {successMessage && (
@@ -629,10 +782,20 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
         <div className="pt-2 flex justify-end">
           <button
             type="submit"
-            className="w-full sm:w-auto px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center justify-center gap-2"
+            disabled={isSaving}
+            className="w-full sm:w-auto px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center justify-center gap-2"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>{t.saveQuestionBtn}</span>
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>{language === 'bn' ? 'ডাটাবেসে সংরক্ষণ হচ্ছে...' : 'Saving to Database...'}</span>
+              </>
+            ) : (
+              <>
+                <PlusCircle className="w-4 h-4" />
+                <span>{t.saveQuestionBtn}</span>
+              </>
+            )}
           </button>
         </div>
       </form>
@@ -730,9 +893,17 @@ export const QuizImportScreen: React.FC<QuizImportScreenProps> = ({
               <button
                 type="button"
                 onClick={handleBatchImport}
-                className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-2xs transition-colors"
+                disabled={isBatchImporting}
+                className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl shadow-2xs transition-colors flex items-center gap-1.5"
               >
-                ইমপোর্ট সম্পন্ন করুন
+                {isBatchImporting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{language === 'bn' ? 'ডাটাবেসে ইমপোর্ট হচ্ছে...' : 'Importing...'}</span>
+                  </>
+                ) : (
+                  <span>{language === 'bn' ? 'ইমপোর্ট সম্পন্ন করুন' : 'Complete Import'}</span>
+                )}
               </button>
             </div>
           </div>

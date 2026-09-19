@@ -21,6 +21,7 @@ import {
   getCustomQuestionsFromCloud,
   saveQuizResultToCloud,
   getQuizHistoryFromCloud,
+  syncLocalAndCloudQuestions,
 } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
@@ -78,7 +79,7 @@ export default function App() {
   const [activeExamQuestions, setActiveExamQuestions] = useState<Question[]>([]);
   const [latestResult, setLatestResult] = useState<QuizResult | null>(null);
 
-  // Function to reload questions and sync with Firestore
+  // Function to reload questions and bi-directionally sync with Firestore
   const syncCloudQuestions = useCallback(async (userId?: string) => {
     const uid = userId || firebaseUser?.uid;
     if (!uid) {
@@ -88,9 +89,10 @@ export default function App() {
     }
 
     try {
-      const cloudCustom = await getCustomQuestionsFromCloud(uid);
-      if (cloudCustom && cloudCustom.length > 0) {
-        saveBatchCustomQuestions(cloudCustom);
+      const localCustom = getCustomQuestions();
+      const syncResult = await syncLocalAndCloudQuestions(uid, localCustom);
+      if (syncResult.success && syncResult.questions) {
+        saveBatchCustomQuestions(syncResult.questions);
       }
       setAllQuestions(getAllQuestions());
       setCustomQuestions(getCustomQuestions());
@@ -403,8 +405,13 @@ export default function App() {
             language={language}
             onRefreshQuestions={refreshQuestions}
             userId={firebaseUser?.uid}
+            onOpenAuth={() => {
+              setIsGuest(false);
+              localStorage.removeItem('duet_guest_mode');
+            }}
             onSyncCloud={async () => {
-              if (firebaseUser) await syncCloudQuestions(firebaseUser.uid);
+              const uid = firebaseUser?.uid || auth.currentUser?.uid;
+              if (uid) await syncCloudQuestions(uid);
             }}
           />
         )}

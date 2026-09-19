@@ -28,9 +28,9 @@ service cloud.firestore {
         && data.id is string && data.id.size() > 0
         && data.subject is string
         && data.category is string
-        && data.questionBn is string && data.questionBn.size() > 0 && data.questionBn.size() <= 2000
+        && data.questionBn is string && data.questionBn.size() > 0 && data.questionBn.size() <= 4000
         && data.optionsBn is list && data.optionsBn.size() == 4
-        && data.correctAnswer is int && data.correctAnswer >= 0 && data.correctAnswer <= 3;
+        && (data.correctAnswer is int || data.correctAnswer is number) && data.correctAnswer >= 0 && data.correctAnswer <= 3;
     }
 
     // Connection testing endpoint

@@ -20,6 +20,7 @@ import {
   collection,
   getDocs,
   getDocFromServer,
+  writeBatch,
 } from 'firebase/firestore';
 import rawFirebaseConfig from '../firebase-applet-config.json';
 import { UserProfile, Question, QuizResult, StudySession } from './types';
@@ -253,41 +254,126 @@ export async function getCustomQuestionsFromCloud(userId: string): Promise<Quest
   }
 }
 
-export async function saveCustomQuestionToCloud(userId: string, question: Question): Promise<void> {
+export async function saveCustomQuestionToCloud(
+  userId: string,
+  question: Question
+): Promise<{ success: boolean; error?: string }> {
   const path = `users/${userId}/custom_questions/${question.id}`;
   try {
     const docRef = doc(db, 'users', userId, 'custom_questions', question.id);
-    await withTimeout(
-      setDoc(docRef, {
-        id: question.id,
-        userId,
-        subject: question.subject,
-        category: question.category,
-        department: question.department || 'civil',
-        questionBn: question.questionBn,
-        questionEn: question.questionEn || '',
-        optionsBn: question.optionsBn,
-        correctAnswer: question.correctAnswer,
-        explanationBn: question.explanationBn || '',
-        explanationEn: question.explanationEn || '',
-        isCustom: true,
-        createdAt: question.createdAt || Date.now(),
-      }),
-      undefined,
-      3000
-    );
-  } catch (error) {
-    if (isOfflineError(error)) {
-      console.warn(`[Firestore Offline] Unable to save question to cloud for ${path}.`);
-      return;
-    }
-    console.warn(`[Firestore Warning] Question save issue for ${path}:`, error);
+    const dataToSave = {
+      id: question.id,
+      userId,
+      subject: question.subject || 'civil',
+      category: question.category || 'department',
+      department: question.department || 'civil',
+      questionBn: question.questionBn.trim(),
+      questionEn: question.questionEn?.trim() || '',
+      optionsBn: question.optionsBn.map((opt) => String(opt).trim()),
+      correctAnswer: Number(question.correctAnswer) >= 0 && Number(question.correctAnswer) <= 3 ? Number(question.correctAnswer) : 0,
+      explanationBn: question.explanationBn?.trim() || '',
+      explanationEn: question.explanationEn?.trim() || '',
+      isCustom: true,
+      createdAt: question.createdAt || Date.now(),
+    };
+    await setDoc(docRef, dataToSave);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[Firestore Save Question Error] ${path}:`, error);
+    return { success: false, error: error?.message || String(error) };
   }
 }
 
-export async function saveBatchCustomQuestionsToCloud(userId: string, questions: Question[]): Promise<void> {
-  for (const q of questions) {
-    await saveCustomQuestionToCloud(userId, q);
+export async function saveBatchCustomQuestionsToCloud(
+  userId: string,
+  questions: Question[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  if (!questions || questions.length === 0) return { success: true, count: 0 };
+  const path = `users/${userId}/custom_questions`;
+  try {
+    // Write in chunks of 400 (Firestore writeBatch limit is 500 operations)
+    const CHUNK_SIZE = 400;
+    let savedCount = 0;
+    for (let i = 0; i < questions.length; i += CHUNK_SIZE) {
+      const chunk = questions.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      for (const q of chunk) {
+        const docRef = doc(db, 'users', userId, 'custom_questions', q.id);
+        batch.set(docRef, {
+          id: q.id,
+          userId,
+          subject: q.subject || 'civil',
+          category: q.category || 'department',
+          department: q.department || 'civil',
+          questionBn: q.questionBn.trim(),
+          questionEn: q.questionEn?.trim() || '',
+          optionsBn: q.optionsBn.map((opt) => String(opt).trim()),
+          correctAnswer: Number(q.correctAnswer) >= 0 && Number(q.correctAnswer) <= 3 ? Number(q.correctAnswer) : 0,
+          explanationBn: q.explanationBn?.trim() || '',
+          explanationEn: q.explanationEn?.trim() || '',
+          isCustom: true,
+          createdAt: q.createdAt || Date.now(),
+        });
+      }
+      await batch.commit();
+      savedCount += chunk.length;
+    }
+    return { success: true, count: savedCount };
+  } catch (error: any) {
+    console.error(`[Firestore Batch Save Error] ${path}:`, error);
+    return { success: false, count: 0, error: error?.message || String(error) };
+  }
+}
+
+/**
+ * Bi-directional Question Synchronizer:
+ * 1. Downloads all questions stored in user's cloud Firestore.
+ * 2. Checks local questions and pushes any that do not yet exist in Firestore.
+ * 3. Returns the combined de-duplicated questions array.
+ */
+export async function syncLocalAndCloudQuestions(
+  userId: string,
+  localQuestions: Question[]
+): Promise<{ success: boolean; questions: Question[]; newlyUploaded: number; error?: string }> {
+  try {
+    const cloudQuestions = await getCustomQuestionsFromCloud(userId);
+    const cloudIds = new Set(cloudQuestions.map((q) => q.id));
+
+    // Find any local questions that haven't been saved to Firestore yet
+    const missingInCloud = localQuestions.filter((q) => !cloudIds.has(q.id));
+
+    let newlyUploaded = 0;
+    if (missingInCloud.length > 0) {
+      const res = await saveBatchCustomQuestionsToCloud(userId, missingInCloud);
+      if (res.success) {
+        newlyUploaded = res.count;
+      }
+    }
+
+    // Merge both sets
+    const map = new Map<string, Question>();
+    for (const q of cloudQuestions) {
+      map.set(q.id, q);
+    }
+    for (const q of localQuestions) {
+      if (!map.has(q.id)) {
+        map.set(q.id, q);
+      }
+    }
+
+    return {
+      success: true,
+      questions: Array.from(map.values()),
+      newlyUploaded,
+    };
+  } catch (err: any) {
+    console.error('syncLocalAndCloudQuestions error:', err);
+    return {
+      success: false,
+      questions: localQuestions,
+      newlyUploaded: 0,
+      error: err?.message || String(err),
+    };
   }
 }
 
