@@ -90,10 +90,30 @@ export function isOfflineError(error: unknown): boolean {
       msg.includes('client is offline') ||
       msg.includes('failed to get document because the client is offline') ||
       msg.includes('unavailable') ||
-      msg.includes('network')
+      msg.includes('network') ||
+      msg.includes('timeout')
     );
   }
   return false;
+}
+
+const DEFAULT_TIMEOUT_MS = 2500;
+
+export async function withTimeout<T>(promise: Promise<T>, fallback: T, ms = DEFAULT_TIMEOUT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(fallback);
+    }, ms);
+  });
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timer!);
+    return result;
+  } catch (err) {
+    clearTimeout(timer!);
+    throw err;
+  }
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
@@ -165,8 +185,8 @@ export async function getUserProfileFromCloud(userId: string): Promise<UserProfi
   const path = `users/${userId}`;
   try {
     const docRef = doc(db, 'users', userId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
+    const snap = await withTimeout(getDoc(docRef), null, 2500);
+    if (snap && snap.exists()) {
       const data = snap.data() as UserProfile;
       return data;
     }
@@ -176,7 +196,8 @@ export async function getUserProfileFromCloud(userId: string): Promise<UserProfi
       console.warn(`[Firestore Offline] Unable to reach cloud for ${path}. Falling back to local data.`);
       return null;
     }
-    handleFirestoreError(error, OperationType.GET, path);
+    console.warn(`[Firestore Warning] Profile load issue for ${path}:`, error);
+    return null;
   }
 }
 
@@ -184,18 +205,22 @@ export async function saveUserProfileToCloud(userId: string, profile: UserProfil
   const path = `users/${userId}`;
   try {
     const docRef = doc(db, 'users', userId);
-    await setDoc(docRef, {
-      ...profile,
-      userId,
-      email: auth.currentUser?.email || '',
-      updatedAt: Date.now(),
-    }, { merge: true });
+    await withTimeout(
+      setDoc(docRef, {
+        ...profile,
+        userId,
+        email: auth.currentUser?.email || '',
+        updatedAt: Date.now(),
+      }, { merge: true }),
+      undefined,
+      3000
+    );
   } catch (error) {
     if (isOfflineError(error)) {
       console.warn(`[Firestore Offline] Unable to save profile to cloud for ${path}.`);
       return;
     }
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.warn(`[Firestore Warning] Profile save issue for ${path}:`, error);
   }
 }
 
@@ -207,7 +232,8 @@ export async function getCustomQuestionsFromCloud(userId: string): Promise<Quest
   const path = `users/${userId}/custom_questions`;
   try {
     const colRef = collection(db, 'users', userId, 'custom_questions');
-    const snapshot = await getDocs(colRef);
+    const snapshot = await withTimeout(getDocs(colRef), null, 2500);
+    if (!snapshot) return [];
     const questions: Question[] = [];
     snapshot.forEach((d) => {
       const qData = d.data() as Question;
@@ -222,7 +248,8 @@ export async function getCustomQuestionsFromCloud(userId: string): Promise<Quest
       console.warn(`[Firestore Offline] Unable to reach cloud for ${path}. Using local questions.`);
       return [];
     }
-    handleFirestoreError(error, OperationType.LIST, path);
+    console.warn(`[Firestore Warning] Questions load issue for ${path}:`, error);
+    return [];
   }
 }
 
@@ -230,27 +257,31 @@ export async function saveCustomQuestionToCloud(userId: string, question: Questi
   const path = `users/${userId}/custom_questions/${question.id}`;
   try {
     const docRef = doc(db, 'users', userId, 'custom_questions', question.id);
-    await setDoc(docRef, {
-      id: question.id,
-      userId,
-      subject: question.subject,
-      category: question.category,
-      department: question.department || 'civil',
-      questionBn: question.questionBn,
-      questionEn: question.questionEn || '',
-      optionsBn: question.optionsBn,
-      correctAnswer: question.correctAnswer,
-      explanationBn: question.explanationBn || '',
-      explanationEn: question.explanationEn || '',
-      isCustom: true,
-      createdAt: question.createdAt || Date.now(),
-    });
+    await withTimeout(
+      setDoc(docRef, {
+        id: question.id,
+        userId,
+        subject: question.subject,
+        category: question.category,
+        department: question.department || 'civil',
+        questionBn: question.questionBn,
+        questionEn: question.questionEn || '',
+        optionsBn: question.optionsBn,
+        correctAnswer: question.correctAnswer,
+        explanationBn: question.explanationBn || '',
+        explanationEn: question.explanationEn || '',
+        isCustom: true,
+        createdAt: question.createdAt || Date.now(),
+      }),
+      undefined,
+      3000
+    );
   } catch (error) {
     if (isOfflineError(error)) {
       console.warn(`[Firestore Offline] Unable to save question to cloud for ${path}.`);
       return;
     }
-    handleFirestoreError(error, OperationType.CREATE, path);
+    console.warn(`[Firestore Warning] Question save issue for ${path}:`, error);
   }
 }
 
@@ -264,13 +295,13 @@ export async function deleteCustomQuestionFromCloud(userId: string, questionId: 
   const path = `users/${userId}/custom_questions/${questionId}`;
   try {
     const docRef = doc(db, 'users', userId, 'custom_questions', questionId);
-    await deleteDoc(docRef);
+    await withTimeout(deleteDoc(docRef), undefined, 3000);
   } catch (error) {
     if (isOfflineError(error)) {
       console.warn(`[Firestore Offline] Unable to delete question from cloud for ${path}.`);
       return;
     }
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.warn(`[Firestore Warning] Question delete issue for ${path}:`, error);
   }
 }
 
@@ -282,7 +313,8 @@ export async function getQuizHistoryFromCloud(userId: string): Promise<QuizResul
   const path = `users/${userId}/quiz_results`;
   try {
     const colRef = collection(db, 'users', userId, 'quiz_results');
-    const snapshot = await getDocs(colRef);
+    const snapshot = await withTimeout(getDocs(colRef), null, 2500);
+    if (!snapshot) return [];
     const results: QuizResult[] = [];
     snapshot.forEach((d) => {
       results.push(d.data() as QuizResult);
@@ -294,7 +326,8 @@ export async function getQuizHistoryFromCloud(userId: string): Promise<QuizResul
       console.warn(`[Firestore Offline] Unable to reach cloud for ${path}. Using local history.`);
       return [];
     }
-    handleFirestoreError(error, OperationType.LIST, path);
+    console.warn(`[Firestore Warning] History load issue for ${path}:`, error);
+    return [];
   }
 }
 
@@ -302,16 +335,20 @@ export async function saveQuizResultToCloud(userId: string, result: QuizResult):
   const path = `users/${userId}/quiz_results/${result.id}`;
   try {
     const docRef = doc(db, 'users', userId, 'quiz_results', result.id);
-    await setDoc(docRef, {
-      ...result,
-      userId,
-    });
+    await withTimeout(
+      setDoc(docRef, {
+        ...result,
+        userId,
+      }),
+      undefined,
+      3000
+    );
   } catch (error) {
     if (isOfflineError(error)) {
       console.warn(`[Firestore Offline] Unable to save quiz result to cloud for ${path}.`);
       return;
     }
-    handleFirestoreError(error, OperationType.CREATE, path);
+    console.warn(`[Firestore Warning] Result save issue for ${path}:`, error);
   }
 }
 
@@ -323,7 +360,8 @@ export async function getStudySessionsFromCloud(userId: string): Promise<StudySe
   const path = `users/${userId}/study_sessions`;
   try {
     const colRef = collection(db, 'users', userId, 'study_sessions');
-    const snapshot = await getDocs(colRef);
+    const snapshot = await withTimeout(getDocs(colRef), null, 2500);
+    if (!snapshot) return [];
     const list: StudySession[] = [];
     snapshot.forEach((d) => {
       list.push(d.data() as StudySession);
@@ -334,7 +372,8 @@ export async function getStudySessionsFromCloud(userId: string): Promise<StudySe
       console.warn(`[Firestore Offline] Unable to reach cloud for ${path}. Using local study sessions.`);
       return [];
     }
-    handleFirestoreError(error, OperationType.LIST, path);
+    console.warn(`[Firestore Warning] Sessions load issue for ${path}:`, error);
+    return [];
   }
 }
 
@@ -342,16 +381,20 @@ export async function saveStudySessionToCloud(userId: string, session: StudySess
   const path = `users/${userId}/study_sessions/${session.id}`;
   try {
     const docRef = doc(db, 'users', userId, 'study_sessions', session.id);
-    await setDoc(docRef, {
-      ...session,
-      userId,
-    });
+    await withTimeout(
+      setDoc(docRef, {
+        ...session,
+        userId,
+      }),
+      undefined,
+      3000
+    );
   } catch (error) {
     if (isOfflineError(error)) {
       console.warn(`[Firestore Offline] Unable to save study session to cloud for ${path}.`);
       return;
     }
-    handleFirestoreError(error, OperationType.CREATE, path);
+    console.warn(`[Firestore Warning] Session save issue for ${path}:`, error);
   }
 }
 
@@ -359,12 +402,12 @@ export async function deleteStudySessionFromCloud(userId: string, sessionId: str
   const path = `users/${userId}/study_sessions/${sessionId}`;
   try {
     const docRef = doc(db, 'users', userId, 'study_sessions', sessionId);
-    await deleteDoc(docRef);
+    await withTimeout(deleteDoc(docRef), undefined, 3000);
   } catch (error) {
     if (isOfflineError(error)) {
       console.warn(`[Firestore Offline] Unable to delete study session from cloud for ${path}.`);
       return;
     }
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.warn(`[Firestore Warning] Session delete issue for ${path}:`, error);
   }
 }

@@ -38,6 +38,7 @@ interface MoreMenuDrawerProps {
   questionCount: number;
   userEmail?: string | null;
   onLogout?: () => void;
+  onOpenAuthModal?: () => void;
 }
 
 export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
@@ -53,6 +54,7 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
   questionCount,
   userEmail,
   onLogout,
+  onOpenAuthModal,
 }) => {
   const t = translations[language];
   const todayMins = getTodayStudyMinutes();
@@ -290,7 +292,7 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
           </div>
 
           {/* User Account & Logout */}
-          {userEmail && (
+          {userEmail ? (
             <div className="pt-3 my-2 border-t border-emerald-100">
               <div className="px-3 py-2 rounded-xl bg-emerald-50/50 border border-emerald-100 mb-2">
                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-900">
@@ -312,6 +314,22 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
                 >
                   <LogOut className="w-4 h-4" />
                   <span>{language === 'bn' ? 'লগআউট করুন' : 'Sign Out'}</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="pt-3 my-2 border-t border-emerald-100">
+              {onOpenAuthModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAuthModal();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200 border border-emerald-300/80 transition-all shadow-2xs"
+                >
+                  <Cloud className="w-4 h-4 text-emerald-700" />
+                  <span>{language === 'bn' ? 'লগইন / ক্লাউড ব্যাকআপ সিঙ্ক' : 'Sign In / Cloud Sync'}</span>
                 </button>
               )}
             </div>

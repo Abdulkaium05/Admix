@@ -53,7 +53,10 @@ export default function App() {
   };
 
   // 2. Firebase Authentication State
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(() => auth.currentUser);
+  const [isGuest, setIsGuest] = useState<boolean>(() => {
+    return localStorage.getItem('duet_guest_mode') === 'true' || !!getUserProfile();
+  });
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
   // 3. User Profile State
@@ -87,74 +90,101 @@ export default function App() {
     try {
       const cloudCustom = await getCustomQuestionsFromCloud(uid);
       if (cloudCustom && cloudCustom.length > 0) {
-        // Merge cloud questions into local storage cache
         saveBatchCustomQuestions(cloudCustom);
       }
       setAllQuestions(getAllQuestions());
       setCustomQuestions(getCustomQuestions());
     } catch (err) {
-      console.error('Failed to sync cloud questions:', err);
-      // Fallback to local storage
+      console.warn('Questions sync warning:', err);
       setAllQuestions(getAllQuestions());
       setCustomQuestions(getCustomQuestions());
     }
-  }, [firebaseUser]);
+  }, [firebaseUser?.uid]);
 
-  // Auth Listener
+  // Safety timer: Never keep the user waiting on loading screen for more than 1 second
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const safetyTimer = setTimeout(() => {
+      setAuthLoading(false);
+    }, 1000);
+    return () => clearTimeout(safetyTimer);
+  }, []);
+
+  // Auth Listener - Runs once on mount
+  useEffect(() => {
+    let isMounted = true;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!isMounted) return;
       setFirebaseUser(user);
+      // Immediately release loading screen so the user never gets stuck
+      setAuthLoading(false);
+
       if (user) {
-        // User is logged in, attempt to fetch profile from Firestore
-        try {
-          const cloudProfile = await getUserProfileFromCloud(user.uid);
-          if (cloudProfile && cloudProfile.completedOnboarding) {
-            setProfile(cloudProfile);
-            saveUserProfile(cloudProfile);
-            setIsOnboardingOpen(false);
-          } else {
-            // Profile doesn't exist yet in cloud (New User) -> Open Onboarding Profile Modal
-            const localProf = getUserProfile();
-            if (localProf && localProf.completedOnboarding) {
-              setProfile(localProf);
-              // Save to cloud
-              await saveUserProfileToCloud(user.uid, localProf);
+        // Load local profile first for instant UI response
+        const localProf = getUserProfile();
+        if (localProf && localProf.completedOnboarding) {
+          setProfile(localProf);
+          setIsOnboardingOpen(false);
+        }
+
+        // Asynchronous background cloud sync
+        (async () => {
+          try {
+            const cloudProfile = await getUserProfileFromCloud(user.uid);
+            if (!isMounted) return;
+            if (cloudProfile && cloudProfile.completedOnboarding) {
+              setProfile(cloudProfile);
+              saveUserProfile(cloudProfile);
               setIsOnboardingOpen(false);
+            } else if (localProf && localProf.completedOnboarding) {
+              saveUserProfileToCloud(user.uid, localProf).catch(() => {});
             } else {
+              setIsOnboardingOpen(true);
+            }
+          } catch (e) {
+            console.warn('Profile background sync:', e);
+            if (!localProf || !localProf.completedOnboarding) {
               setIsOnboardingOpen(true);
             }
           }
 
-          // Fetch cloud questions
-          await syncCloudQuestions(user.uid);
+          // Background sync custom questions
+          try {
+            const cloudCustom = await getCustomQuestionsFromCloud(user.uid);
+            if (!isMounted) return;
+            if (cloudCustom && cloudCustom.length > 0) {
+              saveBatchCustomQuestions(cloudCustom);
+              setAllQuestions(getAllQuestions());
+              setCustomQuestions(getCustomQuestions());
+            }
+          } catch (e) {
+            console.warn('Questions sync warning:', e);
+          }
 
-          // Fetch quiz history from cloud
+          // Background sync quiz history
           try {
             const cloudHistory = await getQuizHistoryFromCloud(user.uid);
+            if (!isMounted) return;
             if (cloudHistory && cloudHistory.length > 0) {
               setHistory(cloudHistory);
             }
           } catch (e) {
-            console.error('History load error:', e);
+            console.warn('History sync warning:', e);
           }
-        } catch (e) {
-          console.error('Error loading cloud user data:', e);
-          const localProf = getUserProfile();
-          if (localProf && localProf.completedOnboarding) {
-            setProfile(localProf);
-            setIsOnboardingOpen(false);
-          } else {
-            setIsOnboardingOpen(true);
-          }
-        }
+        })();
       } else {
-        setProfile(null);
+        // Not logged in to Firebase; check local profile
+        const localProf = getUserProfile();
+        if (localProf && localProf.completedOnboarding) {
+          setProfile(localProf);
+        }
       }
-      setAuthLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [syncCloudQuestions]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   // Refresh questions from storage
   const refreshQuestions = useCallback(() => {
@@ -185,6 +215,9 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await logoutUser();
+      localStorage.removeItem('duet_guest_mode');
+      setIsGuest(false);
+      setFirebaseUser(null);
       setProfile(null);
       setCurrentView('home');
     } catch (err) {
@@ -273,7 +306,7 @@ export default function App() {
     }
   };
 
-  // Auth Loading Screen
+  // Auth Loading Screen (Max 1 second timeout protection)
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#f0fdf4] flex flex-col items-center justify-center p-4">
@@ -282,19 +315,36 @@ export default function App() {
         </div>
         <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2" />
         <p className="text-xs font-bold text-emerald-800">
-          {language === 'bn' ? 'ডাটাবেস লোড হচ্ছে...' : 'Connecting to database...'}
+          {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading...'}
         </p>
+        <button
+          type="button"
+          onClick={() => setAuthLoading(false)}
+          className="mt-3 text-[11px] text-emerald-700 hover:text-emerald-950 underline font-semibold"
+        >
+          {language === 'bn' ? 'সরাসরি প্রবেশ করুন' : 'Skip & Enter'}
+        </button>
       </div>
     );
   }
 
-  // Not Logged In: Show Auth Screen (Sign Up / Login)
-  if (!firebaseUser) {
+  // Not Logged In & Not Guest: Show Auth Screen (Sign Up / Login / Guest Entrance)
+  if (!firebaseUser && !isGuest) {
     return (
       <AuthScreen
         language={language}
         onSuccess={() => {
-          // auth listener handles transition
+          setAuthLoading(false);
+        }}
+        onContinueAsGuest={() => {
+          setIsGuest(true);
+          localStorage.setItem('duet_guest_mode', 'true');
+          const localProf = getUserProfile();
+          if (localProf && localProf.completedOnboarding) {
+            setProfile(localProf);
+          } else {
+            setIsOnboardingOpen(true);
+          }
         }}
       />
     );
@@ -352,8 +402,10 @@ export default function App() {
             customQuestions={customQuestions}
             language={language}
             onRefreshQuestions={refreshQuestions}
-            userId={firebaseUser.uid}
-            onSyncCloud={() => syncCloudQuestions(firebaseUser.uid)}
+            userId={firebaseUser?.uid}
+            onSyncCloud={async () => {
+              if (firebaseUser) await syncCloudQuestions(firebaseUser.uid);
+            }}
           />
         )}
 
@@ -404,8 +456,12 @@ export default function App() {
         onOpenProfileModal={() => setIsOnboardingOpen(true)}
         onOpenCountdownModal={() => setIsCountdownModalOpen(true)}
         questionCount={allQuestions.length}
-        userEmail={firebaseUser.email}
+        userEmail={firebaseUser?.email || null}
         onLogout={handleLogout}
+        onOpenAuthModal={() => {
+          setIsGuest(false);
+          localStorage.removeItem('duet_guest_mode');
+        }}
       />
 
       {/* Admission Countdown Modal */}

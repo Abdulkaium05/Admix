@@ -26,9 +26,10 @@ import {
 interface AuthScreenProps {
   language: Language;
   onSuccess: () => void;
+  onContinueAsGuest?: () => void;
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ language, onSuccess }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ language, onSuccess, onContinueAsGuest }) => {
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -364,6 +365,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ language, onSuccess }) =
             </svg>
             <span>{language === 'bn' ? 'Google দিয়ে সরাসরি সাইন ইন' : 'Sign in with Google'}</span>
           </button>
+
+          {/* Guest Mode Entrance */}
+          {onContinueAsGuest && (
+            <button
+              type="button"
+              onClick={onContinueAsGuest}
+              className="w-full py-2.5 px-4 rounded-xl border border-emerald-300/80 bg-white hover:bg-emerald-50/70 text-emerald-800 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-2xs group"
+            >
+              <span>{language === 'bn' ? 'লগইন ছাড়া সরাসরি অ্যাপে প্রবেশ করুন (গেস্ট মোড)' : 'Explore App as Guest (Offline Mode)'}</span>
+              <ArrowRight className="w-4 h-4 text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
 
           {/* Cloud features badge */}
           <div className="pt-2 border-t border-emerald-50 flex items-center justify-center gap-4 text-[11px] text-emerald-700/80 font-medium">
