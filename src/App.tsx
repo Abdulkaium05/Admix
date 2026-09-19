@@ -139,6 +139,13 @@ export default function App() {
           }
         } catch (e) {
           console.error('Error loading cloud user data:', e);
+          const localProf = getUserProfile();
+          if (localProf && localProf.completedOnboarding) {
+            setProfile(localProf);
+            setIsOnboardingOpen(false);
+          } else {
+            setIsOnboardingOpen(true);
+          }
         }
       } else {
         setProfile(null);
