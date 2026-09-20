@@ -182,12 +182,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* 3. Quick Action Buttons - Simple 3 Cards */}
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      {/* 3. Quick Action Buttons - 4 Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* Study Time */}
+        <button
+          onClick={() => onNavigate('study_time')}
+          className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group"
+        >
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
+          <span className="text-xs font-bold text-emerald-950 group-hover:text-emerald-700 transition-colors">
+            {language === 'bn' ? 'স্টাডি টাইম' : 'Study Time'}
+          </span>
+          <span className="text-[10px] text-emerald-700/70 mt-0.5">
+            {todayStudyMins > 0 ? formatDuration(todayStudyMins, language) : (language === 'bn' ? 'পড়ার রুটিন' : 'Daily Routine')}
+          </span>
+        </button>
+
         {/* AI Support Chat */}
         <button
           onClick={() => onNavigate('ai_support')}
-          className="p-3 sm:p-4 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group"
+          className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group"
         >
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
             <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -201,7 +217,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* History */}
         <button
           onClick={() => onNavigate('history')}
-          className="p-3 sm:p-4 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group"
+          className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group"
         >
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
             <History className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -215,7 +231,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Import Quiz */}
         <button
           onClick={() => onNavigate('import')}
-          className="p-3 sm:p-4 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group"
+          className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-100 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group"
         >
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
             <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />

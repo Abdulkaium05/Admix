@@ -35,6 +35,7 @@ import { QuizImportScreen } from './components/QuizImportScreen';
 import { AiSupportScreen } from './components/AiSupportScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { StudyTimeScreen } from './components/StudyTimeScreen';
+import { StudyGraphScreen } from './components/StudyGraphScreen';
 import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
 import { AuthScreen } from './components/AuthScreen';
 import { EngineerLogo } from './components/EngineerLogo';
@@ -435,6 +436,15 @@ export default function App() {
           <StudyTimeScreen
             language={language}
             onNavigateHome={() => setCurrentView('home')}
+            onNavigateGraph={() => setCurrentView('study_graph')}
+          />
+        )}
+
+        {currentView === 'study_graph' && (
+          <StudyGraphScreen
+            language={language}
+            onBack={() => setCurrentView('study_time')}
+            onNavigateToTracker={() => setCurrentView('study_time')}
           />
         )}
       </main>

@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Sparkles,
   TrendingUp,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -33,6 +34,7 @@ import {
 interface StudyTimeScreenProps {
   language: Language;
   onNavigateHome?: () => void;
+  onNavigateGraph?: () => void;
 }
 
 const PRESET_SUBJECTS = [
@@ -44,7 +46,11 @@ const PRESET_SUBJECTS = [
   { id: 'other', nameBn: 'অন্যান্য / সাধারণ প্রস্তুতি', nameEn: 'General / Other', color: 'bg-stone-100 text-stone-900 border-stone-300' },
 ];
 
-export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNavigateHome }) => {
+export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
+  language,
+  onNavigateHome,
+  onNavigateGraph,
+}) => {
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return new Date().toISOString().slice(0, 10);
@@ -267,9 +273,9 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-emerald-950 flex items-center gap-2">
-              <span>{language === 'bn' ? 'ডেইলি স্টাডি টাইম ট্র্যাকার' : 'Daily Study Time Tracker'}</span>
+              <span>{language === 'bn' ? 'স্টাডি টাইম' : 'Study Time'}</span>
               <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                {language === 'bn' ? 'ক্যালেন্ডার ও হিস্ট্রি' : 'Calendar & Log'}
+                {language === 'bn' ? 'হিস্ট্রি' : 'History'}
               </span>
             </h1>
             <p className="text-xs text-emerald-700/80">
@@ -280,33 +286,48 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
           </div>
         </div>
 
-        {/* Quick Tabs */}
-        <div className="flex items-center gap-1 bg-emerald-50/70 p-1 rounded-xl border border-emerald-100 text-xs font-semibold self-stretch sm:self-auto justify-between sm:justify-start">
-          <button
-            onClick={() => setActiveTab('daily')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              activeTab === 'daily' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-100/60'
-            }`}
-          >
-            {language === 'bn' ? 'আজকের পড়া' : 'Daily View'}
-          </button>
-          <button
-            onClick={() => setActiveTab('all_history')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              activeTab === 'all_history' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-100/60'
-            }`}
-          >
-            {language === 'bn' ? 'সব হিস্ট্রি' : 'All History'} ({sessions.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('timer')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
-              activeTab === 'timer' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-100/60'
-            }`}
-          >
-            <Play className="w-3 h-3" />
-            <span>{language === 'bn' ? 'স্টপওয়াচ' : 'Stopwatch'}</span>
-          </button>
+        {/* Quick Action & Tabs */}
+        <div className="flex items-center gap-1.5 self-stretch sm:self-auto justify-between sm:justify-start flex-wrap">
+          {onNavigateGraph && (
+            <button
+              type="button"
+              onClick={onNavigateGraph}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+              title={language === 'bn' ? 'আলাদা পেজে স্টাডি গ্রাফ দেখুন' : 'View Study Graph'}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'স্টাডি গ্রাফ' : 'Study Graph'}</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-1 bg-emerald-50/70 p-1 rounded-xl border border-emerald-100 text-xs font-semibold">
+            <button
+              onClick={() => setActiveTab('daily')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === 'daily' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-100/60'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'দৈনিক লগ' : 'Daily'}</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('all_history')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                activeTab === 'all_history' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-100/60'
+              }`}
+            >
+              {language === 'bn' ? 'হিস্ট্রি' : 'History'} ({sessions.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('timer')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                activeTab === 'timer' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-100/60'
+              }`}
+            >
+              <Play className="w-3 h-3" />
+              <span>{language === 'bn' ? 'স্টপওয়াচ' : 'Stopwatch'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -732,9 +753,41 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
         </div>
       )}
 
-      {/* 5. DAILY VIEW (Selected Date Logs) */}
+      {/* 5. Dedicated Study Graph Banner & DAILY VIEW (Selected Date Logs) */}
       {activeTab === 'daily' && (
-        <div className="bg-white rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-2xs space-y-4">
+        <div className="space-y-4">
+          {onNavigateGraph && (
+            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-2xl border border-emerald-200/80 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2">
+                    <span>{language === 'bn' ? 'স্টাডি গ্রাফ ও অ্যানালিটিক্স' : 'Study Graph & Analytics'}</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-200 font-bold px-2 py-0.5 rounded-full">
+                      {language === 'bn' ? 'আলাদা পেজ' : 'Separate Page'}
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-emerald-700/80 mt-0.5">
+                    {language === 'bn'
+                      ? 'পড়া শুরুর ১ম দিন থেকে আজকের পড়াশোনার লাইন গ্রাফ ও বার চার্ট আলাদা পেজে দেখুন'
+                      : 'View full animated study curve and progression timeline from Day 1 on a dedicated page'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onNavigateGraph}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs self-stretch sm:self-auto"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>{language === 'bn' ? 'স্টাডি গ্রাফ দেখুন' : 'View Study Graph'}</span>
+              </button>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-2xs space-y-4">
           {/* Date Selector Navigation Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-100">
             <div className="flex items-center gap-2">
@@ -865,6 +918,7 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({ language, onNa
             </div>
           )}
         </div>
+      </div>
       )}
 
       {/* 6. ALL HISTORY TAB (Grouped by Date) */}

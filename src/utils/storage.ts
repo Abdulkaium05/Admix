@@ -262,32 +262,8 @@ export function getStudySessions(): StudySession[] {
   try {
     const data = localStorage.getItem(STUDY_SESSIONS_KEY);
     if (data === null) {
-      // Seed default sample sessions matching user prompt scenario
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const sampleSessions: StudySession[] = [
-        {
-          id: 'study-sample-1',
-          date: todayStr,
-          startTime: '06:00',
-          endTime: '09:00',
-          durationMinutes: 180,
-          subject: 'সিভিল ইঞ্জিনিয়ারিং',
-          topic: 'সার্ভেয়িং ও হাইড্রোলিক্স থিওরি এবং অঙ্ক',
-          notes: 'সকাল ৬:০০ - ৯:০০ টা পর্যন্ত পড়া হয়েছে',
-          createdAt: Date.now() - 3600000 * 4,
-        },
-        {
-          id: 'study-sample-2',
-          date: todayStr,
-          startTime: '10:00',
-          endTime: '12:00',
-          durationMinutes: 120,
-          subject: 'গণিত (Mathematics)',
-          topic: 'ক্যালকুলাস ইন্টিগ্রেশন ও ডিফারেনশিয়াল সমীকরণ',
-          notes: 'সকাল ১০:০০ - ১২:০০ টা পর্যন্ত পড়া হয়েছে',
-          createdAt: Date.now() - 3600000 * 2,
-        },
-      ];
+      // Seed default rich 30-day sample sessions
+      const sampleSessions = generateSampleStudySessions();
       localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(sampleSessions));
       return sampleSessions;
     }
@@ -382,33 +358,63 @@ export function clearAllStudySessions(): void {
   }
 }
 
+export function generateSampleStudySessions(): StudySession[] {
+  const today = new Date();
+  const sampleDataPlan = [
+    { daysAgo: 0, start: '06:00', end: '09:00', duration: 180, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'সার্ভেয়িং ও হাইড্রোলিক্স থিওরি এবং অঙ্ক' },
+    { daysAgo: 0, start: '10:00', end: '12:00', duration: 120, subject: 'গণিত (Mathematics)', topic: 'ক্যালকুলাস ইন্টিগ্রেশন ও ডিফারেনশিয়াল সমীকরণ' },
+    { daysAgo: 1, start: '06:30', end: '09:30', duration: 180, subject: 'পদার্থবিজ্ঞান (Physics)', topic: 'গতিবিদ্যা, নিউটনের সূত্র ও মহাকর্ষ' },
+    { daysAgo: 1, start: '14:00', end: '16:00', duration: 120, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'মেকানিক্স অফ মেটেরিয়ালস স্ট্রেস ও স্ট্রেন' },
+    { daysAgo: 2, start: '07:00', end: '09:30', duration: 150, subject: 'রসায়ন (Chemistry)', topic: 'রাসায়নিক পরিবর্তন ও পর্যায় সারণি' },
+    { daysAgo: 3, start: '06:00', end: '09:30', duration: 210, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'আরসিসি ডিজাইন (RCC Design) ও বিম সমস্যা' },
+    { daysAgo: 3, start: '19:00', end: '21:00', duration: 120, subject: 'ইংরেজি (English)', topic: 'Grammar, Preposition & Vocabulary Practice' },
+    { daysAgo: 4, start: '08:00', end: '11:00', duration: 180, subject: 'গণিত (Mathematics)', topic: 'ম্যাট্রিক্স ও নির্ণায়ক সমাধান' },
+    { daysAgo: 5, start: '06:00', end: '08:30', duration: 150, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'হাইড্রোলিক্স ও ফ্লুইড মেকানিক্স' },
+    { daysAgo: 7, start: '06:00', end: '09:00', duration: 180, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'জিওটেকনিক্যাল ইঞ্জিনিয়ারিং ও সয়েল টেস্ট' },
+    { daysAgo: 7, start: '10:00', end: '12:30', duration: 150, subject: 'পদার্থবিজ্ঞান (Physics)', topic: 'কাজ, ক্ষমতা ও শক্তি' },
+    { daysAgo: 8, start: '19:00', end: '22:00', duration: 180, subject: 'গণিত (Mathematics)', topic: 'ত্রিকোণমিতি ও বৃত্তের সমীকরণ' },
+    { daysAgo: 9, start: '06:30', end: '09:30', duration: 180, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'ট্রান্সপোর্টেশন ও হাইওয়ে ইঞ্জিনিয়ারিং' },
+    { daysAgo: 10, start: '08:00', end: '11:30', duration: 210, subject: 'রসায়ন (Chemistry)', topic: 'পরিবেশ রসায়ন ও জৈব যৌগ প্রস্তুতি' },
+    { daysAgo: 12, start: '06:00', end: '09:30', duration: 210, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'স্ট্রাকচারাল মেকানিক্স ট্রাস এনালাইসিস' },
+    { daysAgo: 12, start: '15:00', end: '17:00', duration: 120, subject: 'ইংরেজি (English)', topic: 'Right form of verbs & Translation' },
+    { daysAgo: 13, start: '07:00', end: '10:00', duration: 180, subject: 'পদার্থবিজ্ঞান (Physics)', topic: 'স্থির তড়িৎ ও চল তড়িৎ' },
+    { daysAgo: 15, start: '06:00', end: '09:30', duration: 210, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'সার্ভেয়িং কনট্যুরিং ও ট্রাভার্সিং' },
+    { daysAgo: 15, start: '19:00', end: '21:30', duration: 150, subject: 'গণিত (Mathematics)', topic: 'বিন্যাস ও সমাবেশ' },
+    { daysAgo: 16, start: '08:00', end: '11:00', duration: 180, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'এনভায়রনমেন্টাল ইঞ্জিনিয়ারিং ওয়াটার ট্রিটমেন্ট' },
+    { daysAgo: 18, start: '06:30', end: '09:30', duration: 180, subject: 'পদার্থবিজ্ঞান (Physics)', topic: 'আলোর প্রতিফলন ও প্রতিসরণ' },
+    { daysAgo: 19, start: '10:00', end: '12:30', duration: 150, subject: 'রসায়ন (Chemistry)', topic: 'রাসায়নিক গণনা ও মোলার দ্রবণ' },
+    { daysAgo: 20, start: '06:00', end: '09:00', duration: 180, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'এসএফডি ও বিএমডি (SFD & BMD) ডায়াগ্রাম' },
+    { daysAgo: 20, start: '14:00', end: '16:00', duration: 120, subject: 'গণিত (Mathematics)', topic: 'দ্বিপদী বিস্তৃতি ও ধারা' },
+    { daysAgo: 22, start: '07:00', end: '10:00', duration: 180, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'এস্টিমেটিং অ্যান্ড কস্টিং বিওকিউ' },
+    { daysAgo: 23, start: '19:00', end: '22:00', duration: 180, subject: 'পদার্থবিজ্ঞান (Physics)', topic: 'শব্দ ও তরঙ্গ সমীকরণ' },
+    { daysAgo: 25, start: '06:00', end: '09:30', duration: 210, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'কলাম ডিজাইন ও ফুটিং হিসাব' },
+    { daysAgo: 26, start: '08:30', end: '11:00', duration: 150, subject: 'গণিত (Mathematics)', topic: 'স্থানাঙ্ক জ্যামিতি ও সরলরেখা' },
+    { daysAgo: 28, start: '06:00', end: '09:00', duration: 180, subject: 'সিভিল ইঞ্জিনিয়ারিং', topic: 'সার্ভেয়িং লেভেলিং ও থিওডোলাইট' },
+    { daysAgo: 28, start: '15:00', end: '17:00', duration: 120, subject: 'ইংরেজি (English)', topic: 'Synonyms, Antonyms & Idioms' },
+    { daysAgo: 29, start: '07:00', end: '10:00', duration: 180, subject: 'রসায়ন (Chemistry)', topic: 'তড়িৎ রসায়ন ও জারণ-বিজারণ' },
+  ];
+
+  return sampleDataPlan.map((item, idx) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - item.daysAgo);
+    const dateStr = d.toISOString().slice(0, 10);
+    return {
+      id: `study-sample-30d-${idx + 1}`,
+      date: dateStr,
+      startTime: item.start,
+      endTime: item.end,
+      durationMinutes: item.duration,
+      subject: item.subject,
+      topic: item.topic,
+      notes: `${item.start} - ${item.end} স্টাডি সম্পন্ন`,
+      createdAt: d.getTime() + idx * 1000,
+    };
+  });
+}
+
 export function resetSampleStudySessions(): StudySession[] {
   try {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const sampleSessions: StudySession[] = [
-      {
-        id: 'study-sample-1',
-        date: todayStr,
-        startTime: '06:00',
-        endTime: '09:00',
-        durationMinutes: 180,
-        subject: 'সিভিল ইঞ্জিনিয়ারিং',
-        topic: 'সার্ভেয়িং ও হাইড্রোলিক্স থিওরি এবং অঙ্ক',
-        notes: 'সকাল ৬:০০ - ৯:০০ টা পর্যন্ত পড়া হয়েছে',
-        createdAt: Date.now() - 3600000 * 4,
-      },
-      {
-        id: 'study-sample-2',
-        date: todayStr,
-        startTime: '10:00',
-        endTime: '12:00',
-        durationMinutes: 120,
-        subject: 'গণিত (Mathematics)',
-        topic: 'ক্যালকুলাস ইন্টিগ্রেশন ও ডিফারেনশিয়াল সমীকরণ',
-        notes: 'সকাল ১০:০০ - ১২:০০ টা পর্যন্ত পড়া হয়েছে',
-        createdAt: Date.now() - 3600000 * 2,
-      },
-    ];
+    const sampleSessions = generateSampleStudySessions();
     localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(sampleSessions));
     return sampleSessions;
   } catch (e) {
