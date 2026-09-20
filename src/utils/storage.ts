@@ -1,4 +1,4 @@
-import { UserProfile, QuizResult, Question, DailyLimitInfo, SemesterGrades, StudySession } from '../types';
+import { UserProfile, QuizResult, Question, DailyLimitInfo, SemesterGrades, StudySession, StudyTask } from '../types';
 import { defaultQuestions } from '../data/defaultQuestions';
 
 const PROFILE_KEY = 'duet_user_profile_v1';
@@ -6,6 +6,7 @@ const HISTORY_KEY = 'duet_quiz_history_v1';
 const CUSTOM_QUESTIONS_KEY = 'duet_custom_questions_v1';
 const DAILY_LIMIT_KEY = 'duet_daily_limit_v1';
 const STUDY_SESSIONS_KEY = 'duet_study_sessions_v1';
+const STUDY_TASKS_KEY = 'duet_study_tasks_v1';
 
 export const MAX_DAILY_EXAMS = 5;
 
@@ -507,5 +508,241 @@ export function formatDuration(minutes: number, language: 'bn' | 'en' = 'bn'): s
     } else {
       return `${mins}m`;
     }
+  }
+}
+
+// ==========================================
+// Study Tasks & Daily Planner Management
+// ==========================================
+
+export function getTodayDateString(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function getTomorrowDateString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function getYesterdayDateString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function generateSampleStudyTasks(): StudyTask[] {
+  const todayStr = getTodayDateString();
+  const tomorrowStr = getTomorrowDateString();
+
+  return [
+    {
+      id: 'task-demo-1',
+      title: 'সার্ভেয়িং লেভেলিং অঙ্ক ও থিওরি রিভিশন',
+      subject: 'সিভিল ইঞ্জিনিয়ারিং',
+      targetDate: todayStr,
+      completed: false,
+      order: 1,
+      priority: 'high',
+      notes: 'ডুয়েট বিগত বছরের প্রশ্ন সমাধান করা হবে',
+      createdAt: Date.now() - 3600000 * 2,
+    },
+    {
+      id: 'task-demo-2',
+      title: 'ক্যালকুলাস ইন্টিগ্রেশন প্র্যাকটিস (চ্যাপ্টার ৫)',
+      subject: 'গণিত (Mathematics)',
+      targetDate: todayStr,
+      completed: false,
+      order: 2,
+      priority: 'medium',
+      createdAt: Date.now() - 3600000,
+    },
+    {
+      id: 'task-demo-3',
+      title: 'আরসিসি ডিজাইন ও ফুটিং ক্যালকুলেশন',
+      subject: 'সিভিল ইঞ্জিনিয়ারিং',
+      targetDate: tomorrowStr,
+      completed: false,
+      order: 3,
+      priority: 'high',
+      notes: 'আগামীকালের জন্য আগে থেকেই সেট করা টাস্ক',
+      createdAt: Date.now(),
+    },
+    {
+      id: 'task-demo-4',
+      title: 'পদার্থবিজ্ঞান গতিবিদ্যা ও মহাকর্ষ সূত্রাবলী',
+      subject: 'পদার্থবিজ্ঞান (Physics)',
+      targetDate: tomorrowStr,
+      completed: false,
+      order: 4,
+      priority: 'medium',
+      createdAt: Date.now(),
+    },
+  ];
+}
+
+export function getStudyTasks(): StudyTask[] {
+  try {
+    const data = localStorage.getItem(STUDY_TASKS_KEY);
+    if (!data) {
+      const initial = generateSampleStudyTasks();
+      localStorage.setItem(STUDY_TASKS_KEY, JSON.stringify(initial));
+      return initial;
+    }
+    const parsed: StudyTask[] = JSON.parse(data);
+    const todayStr = getTodayDateString();
+    let hasChanges = false;
+
+    // Rollover logic:
+    // Any incomplete task with targetDate strictly earlier than today (yesterday or older)
+    // is automatically carried forward to today!
+    const updated = parsed.map((task) => {
+      if (!task.completed && task.targetDate < todayStr) {
+        hasChanges = true;
+        return {
+          ...task,
+          originalDate: task.originalDate || task.targetDate,
+          targetDate: todayStr,
+          rolledOver: true,
+        };
+      }
+      return task;
+    });
+
+    if (hasChanges) {
+      localStorage.setItem(STUDY_TASKS_KEY, JSON.stringify(updated));
+    }
+
+    // Return sorted by custom order ascending, fallback to createdAt
+    return updated.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt - b.createdAt);
+  } catch (e) {
+    console.error('Failed to load study tasks', e);
+    return [];
+  }
+}
+
+export function saveStudyTask(task: StudyTask): void {
+  try {
+    const tasks = getStudyTasks();
+    const existingIndex = tasks.findIndex((t) => t.id === task.id);
+    if (existingIndex >= 0) {
+      tasks[existingIndex] = task;
+    } else {
+      const maxOrder = tasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0);
+      task.order = task.order !== undefined ? task.order : maxOrder + 1;
+      tasks.push(task);
+    }
+    localStorage.setItem(STUDY_TASKS_KEY, JSON.stringify(tasks));
+  } catch (e) {
+    console.error('Failed to save study task', e);
+  }
+}
+
+export function saveAllStudyTasks(tasks: StudyTask[]): void {
+  try {
+    localStorage.setItem(STUDY_TASKS_KEY, JSON.stringify(tasks));
+  } catch (e) {
+    console.error('Failed to save all study tasks', e);
+  }
+}
+
+export function deleteStudyTask(taskId: string): void {
+  try {
+    const tasks = getStudyTasks().filter((t) => t.id !== taskId);
+    localStorage.setItem(STUDY_TASKS_KEY, JSON.stringify(tasks));
+  } catch (e) {
+    console.error('Failed to delete study task', e);
+  }
+}
+
+export function reorderStudyTasks(orderedTasks: StudyTask[]): StudyTask[] {
+  try {
+    const updated = orderedTasks.map((t, idx) => ({
+      ...t,
+      order: idx + 1,
+    }));
+    // We update only these tasks while preserving other tasks in storage
+    const allTasks = getStudyTasks();
+    const updatedMap = new Map(updated.map((t) => [t.id, t]));
+    const finalTasks = allTasks.map((t) => updatedMap.get(t.id) || t);
+    localStorage.setItem(STUDY_TASKS_KEY, JSON.stringify(finalTasks));
+    return updated;
+  } catch (e) {
+    console.error('Failed to reorder study tasks', e);
+    return orderedTasks;
+  }
+}
+
+/**
+ * Completes a task and prompts/records start and end times into Study Time Tracker.
+ */
+export function completeTaskWithStudyTime(
+  taskId: string,
+  startTime: string,
+  endTime: string,
+  sessionDate?: string
+): { updatedTask: StudyTask | null; createdSession: StudySession | null } {
+  try {
+    const tasks = getStudyTasks();
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return { updatedTask: null, createdSession: null };
+
+    const duration = calculateStudyDurationMinutes(startTime, endTime);
+    const date = sessionDate || task.targetDate || getTodayDateString();
+
+    const newSession: StudySession = {
+      id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      date,
+      startTime,
+      endTime,
+      durationMinutes: duration > 0 ? duration : 60,
+      subject: task.subject,
+      topic: task.title,
+      notes: task.notes ? `(টাস্ক থেকে সম্পন্ন) ${task.notes}` : `টাস্ক সম্পন্ন: ${task.title}`,
+      createdAt: Date.now(),
+    };
+
+    // 1. Save directly to Study Time Tracker sessions
+    saveStudySession(newSession);
+
+    // 2. Mark task as completed
+    task.completed = true;
+    task.completedAt = Date.now();
+    task.completedSessionId = newSession.id;
+    task.studyTimeSpent = {
+      startTime,
+      endTime,
+      durationMinutes: newSession.durationMinutes,
+    };
+
+    saveAllStudyTasks(tasks);
+
+    return { updatedTask: task, createdSession: newSession };
+  } catch (e) {
+    console.error('Failed to complete task with study time', e);
+    return { updatedTask: null, createdSession: null };
+  }
+}
+
+export function moveTaskToDate(taskId: string, newDate: string): void {
+  try {
+    const tasks = getStudyTasks();
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      task.targetDate = newDate;
+      saveAllStudyTasks(tasks);
+    }
+  } catch (e) {
+    console.error('Failed to move task date', e);
   }
 }

@@ -36,13 +36,21 @@ import { AiSupportScreen } from './components/AiSupportScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { StudyTimeScreen } from './components/StudyTimeScreen';
 import { StudyGraphScreen } from './components/StudyGraphScreen';
+import { StudyTasksScreen } from './components/StudyTasksScreen';
 import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
 import { AuthScreen } from './components/AuthScreen';
 import { EngineerLogo } from './components/EngineerLogo';
 
 export default function App() {
-  // 1. Language State (Theme is permanently White & Light Green)
-  const [language, setLanguage] = useState<Language>('bn');
+  // 1. Language State with localStorage persistence
+  const [language, setLanguage] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('duet_app_language');
+      return saved === 'bn' || saved === 'en' ? (saved as Language) : 'bn';
+    } catch {
+      return 'bn';
+    }
+  });
 
   // Enforce pure light theme
   useEffect(() => {
@@ -51,7 +59,15 @@ export default function App() {
   }, []);
 
   const toggleLanguage = () => {
-    setLanguage((prev) => (prev === 'bn' ? 'en' : 'bn'));
+    setLanguage((prev) => {
+      const next = prev === 'bn' ? 'en' : 'bn';
+      try {
+        localStorage.setItem('duet_app_language', next);
+      } catch (e) {
+        console.error('Failed to save language preference:', e);
+      }
+      return next;
+    });
   };
 
   // 2. Firebase Authentication State
@@ -437,6 +453,7 @@ export default function App() {
             language={language}
             onNavigateHome={() => setCurrentView('home')}
             onNavigateGraph={() => setCurrentView('study_graph')}
+            onNavigateTasks={() => setCurrentView('study_tasks')}
           />
         )}
 
@@ -445,6 +462,15 @@ export default function App() {
             language={language}
             onBack={() => setCurrentView('study_time')}
             onNavigateToTracker={() => setCurrentView('study_time')}
+          />
+        )}
+
+        {currentView === 'study_tasks' && (
+          <StudyTasksScreen
+            language={language}
+            onBack={() => setCurrentView('home')}
+            onNavigateStudyTime={() => setCurrentView('study_time')}
+            onNavigateStudyGraph={() => setCurrentView('study_graph')}
           />
         )}
       </main>

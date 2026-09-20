@@ -2,7 +2,7 @@ import React from 'react';
 import { UserProfile, DailyLimitInfo, AppView } from '../types';
 import { translations, Language } from '../utils/i18n';
 import { EngineerLogo } from './EngineerLogo';
-import { MAX_DAILY_EXAMS, getTodayStudyMinutes, formatDuration } from '../utils/storage';
+import { MAX_DAILY_EXAMS, getTodayStudyMinutes, formatDuration, getStudyTasks, getTodayDateString, getTomorrowDateString } from '../utils/storage';
 import {
   Play,
   PlusCircle,
@@ -15,6 +15,7 @@ import {
   Clock,
   Award,
   CheckCircle2,
+  ListTodo,
 } from 'lucide-react';
 
 interface HomeScreenProps {
@@ -38,6 +39,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const t = translations[language];
   const todayStudyMins = getTodayStudyMinutes();
+  const allTasks = getStudyTasks();
+  const todayStr = getTodayDateString();
+  const tomorrowStr = getTomorrowDateString();
+  const pendingTodayTasks = allTasks.filter((t) => t.targetDate === todayStr && !t.completed).length;
+  const tomorrowTasksCount = allTasks.filter((t) => t.targetDate === tomorrowStr).length;
 
   const examsRemaining = Math.max(0, MAX_DAILY_EXAMS - dailyLimit.count);
   const isLimitReached = examsRemaining <= 0;
@@ -182,8 +188,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* 3. Quick Action Buttons - 4 Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+      {/* 3. Quick Action Buttons - 5 Cards Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
+        {/* Study Tasks Planner (New Separate Feature) */}
+        <button
+          onClick={() => onNavigate('study_tasks')}
+          className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-200/80 hover:border-emerald-400 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group relative overflow-hidden"
+        >
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+            <ListTodo className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700" />
+          </div>
+          <span className="text-xs font-bold text-emerald-950 group-hover:text-emerald-700 transition-colors">
+            {language === 'bn' ? 'টাস্ক প্ল্যানার' : 'Task Planner'}
+          </span>
+          <span className="text-[10px] text-emerald-700/80 mt-0.5">
+            {pendingTodayTasks > 0
+              ? (language === 'bn' ? `${pendingTodayTasks}টি বাকি` : `${pendingTodayTasks} pending`)
+              : tomorrowTasksCount > 0
+              ? (language === 'bn' ? `কালকে ${tomorrowTasksCount}টি` : `${tomorrowTasksCount} tomorrow`)
+              : (language === 'bn' ? 'পরের দিনের প্ল্যান' : 'Daily Plan')}
+          </span>
+        </button>
+
         {/* Study Time */}
         <button
           onClick={() => onNavigate('study_time')}

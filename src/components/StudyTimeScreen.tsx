@@ -29,12 +29,14 @@ import {
   AlertTriangle,
   RefreshCw,
   Check,
+  ListTodo,
 } from 'lucide-react';
 
 interface StudyTimeScreenProps {
   language: Language;
   onNavigateHome?: () => void;
   onNavigateGraph?: () => void;
+  onNavigateTasks?: () => void;
 }
 
 const PRESET_SUBJECTS = [
@@ -50,6 +52,7 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
   language,
   onNavigateHome,
   onNavigateGraph,
+  onNavigateTasks,
 }) => {
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -288,6 +291,18 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
 
         {/* Quick Action & Tabs */}
         <div className="flex items-center gap-1.5 self-stretch sm:self-auto justify-between sm:justify-start flex-wrap">
+          {onNavigateTasks && (
+            <button
+              type="button"
+              onClick={onNavigateTasks}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200/80 text-emerald-900 border border-emerald-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+              title={language === 'bn' ? 'টাস্ক প্ল্যানারে যান' : 'Go to Task Planner'}
+            >
+              <ListTodo className="w-3.5 h-3.5 text-emerald-700" />
+              <span>{language === 'bn' ? 'টাস্ক প্ল্যানার' : 'Task Planner'}</span>
+            </button>
+          )}
+
           {onNavigateGraph && (
             <button
               type="button"

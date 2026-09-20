@@ -89,4 +89,25 @@ export interface StudySession {
   createdAt: number;
 }
 
-export type AppView = 'home' | 'exam' | 'result' | 'import' | 'history' | 'ai_support' | 'profile' | 'study_time' | 'study_graph';
+export interface StudyTask {
+  id: string;
+  title: string; // Task topic / title
+  subject: string; // Subject e.g. "Civil Engineering", "Math"
+  targetDate: string; // YYYY-MM-DD
+  completed: boolean;
+  completedAt?: number;
+  completedSessionId?: string; // Linked study session id
+  studyTimeSpent?: {
+    startTime: string;
+    endTime: string;
+    durationMinutes: number;
+  };
+  order: number; // For custom serial / reordering
+  rolledOver?: boolean; // True if rolled over from previous day
+  originalDate?: string; // Original planned date if rolled over
+  priority?: 'high' | 'medium' | 'low';
+  notes?: string;
+  createdAt: number;
+}
+
+export type AppView = 'home' | 'exam' | 'result' | 'import' | 'history' | 'ai_support' | 'profile' | 'study_time' | 'study_graph' | 'study_tasks';
