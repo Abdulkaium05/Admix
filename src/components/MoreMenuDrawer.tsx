@@ -376,11 +376,13 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
 
         {/* Bottom App Note */}
         <div className="p-4 border-t border-emerald-100 bg-emerald-50/40 text-center">
-          <p className="text-[11px] text-emerald-700 font-medium">
-            Admix • ডুয়েট ভর্তি কুইজ ও মডেল টেস্ট
+          <p className="text-[11px] text-emerald-950 font-bold">
+            {language === 'bn' ? 'Admix • ডুয়েট ভর্তি প্রস্তুতি ও মডেল টেস্ট' : 'Admix • DUET Admission Prep & Model Test'}
           </p>
-          <p className="text-[10px] text-emerald-600/70">
-            সাদা ও হালকা সবুজ থিম
+          <p className="text-[10px] text-emerald-700/80 mt-0.5">
+            {language === 'bn'
+              ? 'পরিশ্রম ও নিয়মিত অনুশীলনই ডুয়েট সাফল্যের মূল চাবিকাঠি'
+              : 'Consistent hard work & daily practice lead to DUET success'}
           </p>
         </div>
       </div>

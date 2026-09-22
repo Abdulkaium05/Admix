@@ -28,6 +28,87 @@ async function startServer() {
     return aiClient;
   }
 
+  // Candidate models from @google/genai guidelines
+  const CANDIDATE_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+  ];
+
+  // Helper for resilient generation with retries on transient 503/429 spikes
+  async function callGeminiWithFallback(
+    client: GoogleGenAI,
+    prompt: string,
+    systemInstruction?: string,
+    temperature: number = 0.4
+  ): Promise<string | null> {
+    for (const model of CANDIDATE_MODELS) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await client.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              ...(systemInstruction ? { systemInstruction } : {}),
+              temperature,
+            },
+          });
+          const text = response?.text?.trim();
+          if (text) {
+            return text;
+          }
+        } catch (err: any) {
+          const errMsg = err?.message || String(err);
+          const isTransient =
+            err?.status === 503 ||
+            err?.code === 503 ||
+            errMsg.includes("503") ||
+            errMsg.includes("high demand") ||
+            errMsg.includes("UNAVAILABLE") ||
+            err?.status === 429 ||
+            err?.code === 429 ||
+            errMsg.includes("429") ||
+            errMsg.includes("RESOURCE_EXHAUSTED");
+
+          if (isTransient && attempt === 0) {
+            // Wait briefly before retrying model
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            continue;
+          }
+          // Move to next candidate model
+          break;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Domain-specific intelligent fallback for DUET admission topics
+  function getSmartFallbackAnswer(question: string, language: string = "bn"): string {
+    const qLower = question.toLowerCase();
+
+    if (language === "bn") {
+      let specificTopicAdvice = "";
+      if (qLower.includes("সার্ভে") || qLower.includes("survey") || qLower.includes("লেভেলিং") || qLower.includes("লেভেল")) {
+        specificTopicAdvice = `\n\n📌 **সার্ভেয়িং ফোকাস পয়েন্ট:**\n- লেভেলিংয়ের ক্ষেত্রে $RL = HI - FS$ এবং $HI = BM + BS$ সূত্র মনে রাখুন।\n- থিওডোলাইট, ট্রাভার্সিং এবং কম্পাস কারেকশন (W.C.B & R.B) সংক্রান্ত অংকগুলো ডুয়েটের জন্য খুব গুরুত্বপূর্ণ।`;
+      } else if (qLower.includes("ম্যাথ") || qLower.includes("গণিত") || qLower.includes("ইন্টিগ্রেশন") || qLower.includes("ক্যালকুলাস") || qLower.includes("ডিফারেনশিয়াল")) {
+        specificTopicAdvice = `\n\n📌 **গণিত ফোকাস পয়েন্ট:**\n- ক্যালকুলাসের লিমিট, ম্যাক্সিমা-মিনিমা এবং ডেফিনিট ইন্টিগ্রেশনের স্ট্যান্ডার্ড সূত্র নিয়মিত প্র্যাকটিস করুন।\n- স্থানাঙ্ক জ্যামিতি (সরলরেখা ও বৃত্ত) এবং ম্যাট্রিক্স-নির্ণায়ক থেকে প্রতি বছর ডুয়েটে প্রশ্ন আসে।`;
+      } else if (qLower.includes("পদার্থ") || qLower.includes("physics") || qLower.includes("বলবিদ্যা") || qLower.includes("আলো") || qLower.includes("থার্মো")) {
+        specificTopicAdvice = `\n\n📌 **পদার্থবিজ্ঞান ফোকাস পয়েন্ট:**\n- নিউটনের গতিসূত্র, কাজ-ক্ষমতা-শক্তি এবং ঘর্ষণ সংক্রান্ত বলবিদ্যার ম্যাথগুলো স্পষ্ট ডায়াগ্রাম এঁকে সমাধান করুন।\n- তাপগতিবিদ্যার প্রথম ও দ্বিতীয় সূত্র এবং জ্যামিতিক আলোকবিজ্ঞানের লেন্স ও প্রিজম সূত্রগুলো আয়ত্তে রাখুন।`;
+      } else if (qLower.includes("রসায়ন") || qLower.includes("chemistry") || qLower.includes("জৈব") || qLower.includes("পর্যায়")) {
+        specificTopicAdvice = `\n\n📌 **রসায়ন ফোকাস পয়েন্ট:**\n- গ্যাস সূত্র ($PV = nRT$), মোলারিটি ও স্টয়কিওমেট্রি গাণিতিক সমস্যাগুলোর একক সতর্কতার সাথে রূপান্তর করুন।\n- পর্যায় সারণির সাধারণ ধর্ম এবং রাসায়নিক বন্ধনের মূল ধারণা স্পষ্ট রাখুন।`;
+      } else if (qLower.includes("ইংরেজি") || qLower.includes("english") || qLower.includes("grammar") || qLower.includes("preposition")) {
+        specificTopicAdvice = `\n\n📌 **ইংরেজি ফোকাস পয়েন্ট:**\n- Appropriate Preposition, Subject-Verb Agreement, Voice and Narration পরিবর্তনের নিয়মগুলো নিয়মিত রিভিশন দিন।\n- সিনোনিম ও অ্যান্টোনিম প্রতিদিন ৫-১০টি করে মুখস্থ করে খাতায় নোট রাখুন।`;
+      } else if (qLower.includes("রুটিন") || qLower.includes("পড়াশোনা") || qLower.includes("সময়") || qLower.includes("পরামর্শ") || qLower.includes("plan")) {
+        specificTopicAdvice = `\n\n📌 **স্টাডি প্ল্যানিং টিপস:**\n- প্রতিদিন ডিপার্টমেন্ট ও নন-ডিপার্টমেন্ট উভয় বিষয়ের জন্য সমান ভারসাম্য বজায় রাখুন।\n- আগেরদিন রাতে টাস্ক প্ল্যানারে পরের দিনের সুনির্দিষ্ট টপিকগুলো নোট করে রাখুন।`;
+      }
+
+      return `**[ডুয়েট এআই মেন্টর সহায়তা নোট]**\n\n**আপনার অনুসন্ধান:** "${question}"\n\n💡 **এডমিশন গাইডলাইন:**\n- প্রশ্নের মূল থিওরি ও স্ট্যান্ডার্ড ফর্মুলাগুলো ধাপে ধাপে প্রয়োগ করুন।\n- ক্যালকুলেটরে হিসাব করার সময় এককের সঙ্গতি (SI / MKS / FPS) যাচাই করুন।${specificTopicAdvice}\n\n*(সার্ভারে এআই মডেলের উচ্চ চাহিদার কারণে এটি তাৎক্ষণিক মেন্টর নোট হিসেবে পরিবেশন করা হয়েছে। পুনরায় জিজ্ঞাসা করলে লাইভ বিশ্লেষণ দেখতে পাবেন।)*`;
+    } else {
+      return `**[DUET AI Mentor Note]**\n\n**Your Question:** "${question}"\n\n💡 **Preparation Guidelines:**\n- Focus on foundational theories, clear derivation steps, and past DUET entrance questions.\n- Pay careful attention to unit conversions (SI system) and neat diagram sketches in Civil engineering problems.\n\n*(Instant mentor advice provided. Try again for extended live analysis.)*`;
+    }
+  }
+
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -46,9 +127,7 @@ async function startServer() {
       const client = getGeminiClient();
       if (!client) {
         res.json({
-          answer: language === "bn"
-            ? `**[ডুয়েট অফলাইন সহায়িকা]**\n\n**প্রশ্ন:** ${question}\n\n**পরামর্শ:** DUET ভর্তি পরীক্ষার জন্য মূল থিওরি, সূত্র ও বিগত বছরের প্রশ্ন ভালো করে চর্চা করুন। সার্ভারে এআই সক্রিয় করতে সেটিংস থেকে GEMINI_API_KEY নিশ্চিত করুন।`
-            : `**[DUET Offline Guide]**\n\n**Question:** ${question}\n\n**Advice:** Master the foundational theories, formulas, and past DUET question patterns.`,
+          answer: getSmartFallbackAnswer(question, language),
           isFallback: true,
         });
         return;
@@ -69,30 +148,7 @@ Guidelines:
 
       const prompt = `Subject: ${subject || "DUET Admission Test"}\nPreferred Language: ${language === "en" ? "English" : "Bengali"}\n\nStudent Question:\n${question}`;
 
-      // Try responsive models in order: gemini-3.6-flash, gemini-3.8-flash, gemini-flash-latest
-      const candidateModels = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-flash-latest"];
-      let answerText = "";
-      let lastError: any = null;
-
-      for (const model of candidateModels) {
-        try {
-          const response = await client.models.generateContent({
-            model,
-            contents: prompt,
-            config: {
-              systemInstruction,
-              temperature: 0.4,
-            },
-          });
-          if (response.text) {
-            answerText = response.text;
-            break;
-          }
-        } catch (err: any) {
-          lastError = err;
-          console.warn(`Model ${model} failed with:`, err?.message || err);
-        }
-      }
+      const answerText = await callGeminiWithFallback(client, prompt, systemInstruction, 0.4);
 
       if (answerText) {
         res.json({
@@ -100,20 +156,18 @@ Guidelines:
           isFallback: false,
         });
       } else {
-        // If models are temporarily unreachable, provide an informative mentor answer
+        // Return context-aware mentor guidance when models undergo temporary spike
         res.json({
-          answer: language === "bn"
-            ? `**[ডুয়েট এআই মেন্টর প্রস্তুতি নোট]**\n\nআপনার প্রশ্ন: **${question}**\n\n📌 **গুরুত্বপূর্ণ পরামর্শ:**\n- ডুয়েট ভর্তি পরীক্ষায় সিভিল ও নন-ডিপার্টমেন্ট (ম্যাথ, পদার্থ, রসায়ন, ইংরেজি) প্রতিটি অংশের নম্বর সমানভাবে গুরুত্বপূর্ণ।\n- প্রতিদিন নিয়মিত স্টাডি টাইম ট্র্যাক করুন এবং বিগত বছরের প্রশ্ন সমাধান করুন।\n\n*(সার্ভিসটি পুনরায় চেষ্টা করলে পূর্ণাঙ্গ লাইভ বিশ্লেষণ পেয়ে যাবেন)*`
-            : `**[DUET AI Mentor Note]**\n\nQuestion: **${question}**\n\nKey focus: Practice past DUET questions, core structural calculations, and calculus applications regularly.`,
+          answer: getSmartFallbackAnswer(question, language),
           isFallback: true,
-          error: lastError?.message,
         });
       }
     } catch (err: any) {
-      console.error("Gemini API Route Error:", err?.message || err);
-      res.status(500).json({
-        error: "এআই সার্ভিসে সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।",
-        details: err?.message,
+      const language = req.body?.language || "bn";
+      const question = req.body?.question || "";
+      res.json({
+        answer: getSmartFallbackAnswer(question, language),
+        isFallback: true,
       });
     }
   });
@@ -135,13 +189,10 @@ Guidelines:
 
       const prompt = `Translate the following academic / engineering question or options from ${targetLang === "en" ? "Bengali to English" : "English to Bengali"}. Maintain scientific and engineering terminology precisely. Only return the translated text with no extra conversational commentary.\n\nText:\n${text}`;
 
-      const response = await client.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-      });
+      const translated = await callGeminiWithFallback(client, prompt, undefined, 0.2);
 
-      res.json({ translatedText: response.text?.trim() || text });
-    } catch (err) {
+      res.json({ translatedText: translated || text });
+    } catch (_err) {
       res.json({ translatedText: req.body.text });
     }
   });

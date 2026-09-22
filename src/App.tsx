@@ -477,11 +477,15 @@ export default function App() {
 
       {/* Subtle Clean Footer */}
       {currentView !== 'exam' && (
-        <footer className="border-t border-emerald-100 py-4 px-4 bg-white/60 text-center text-xs text-emerald-800/70">
+        <footer className="border-t border-emerald-100 py-3.5 px-4 bg-white/70 text-center text-xs text-emerald-800/80">
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1.5">
-            <p>Admix • ডুয়েট ভর্তি প্রস্তুতি ও মডেল টেস্ট</p>
-            <p className="font-semibold text-emerald-700">
-              ফায়ারবেস ক্লাউড ডাটাবেস সংযুক্ত • যেকোনো ডিভাইস সিঙ্ক
+            <p className="font-bold text-emerald-950">
+              {language === 'bn' ? 'Admix • ডুয়েট ভর্তি প্রস্তুতি ও মডেল টেস্ট' : 'Admix • DUET Admission Prep & Model Test'}
+            </p>
+            <p className="font-medium text-emerald-700">
+              {language === 'bn'
+                ? 'স্বপ্ন যেখানে ইঞ্জিনিয়ার হওয়া • নিয়মিত প্রস্তুতিতেই ডুয়েট সাফল্য'
+                : 'Dream to be an Engineer • Daily Practice Leads to DUET Success'}
             </p>
           </div>
         </footer>
