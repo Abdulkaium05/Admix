@@ -50,11 +50,28 @@ export const ElementValencyQuiz: React.FC<ElementValencyQuizProps> = ({ language
     }
   }, [selectedFilter]);
 
-  // Current Element State
-  const [currentElementIndex, setCurrentElementIndex] = useState<number>(() =>
-    Math.floor(Math.random() * chemicalElements.length)
-  );
-  const currentElement = filteredPool[currentElementIndex % filteredPool.length] || chemicalElements[0];
+  // Non-repeating randomized queue of element IDs.
+  // When a pool has > 40 elements (e.g. all 54 elements), an element is guaranteed NEVER to appear again within 40 turns!
+  // Even for smaller filtered categories, it will exhaust all available items before cycling, and avoids immediate repeats.
+  const [queue, setQueue] = useState<string[]>(() => {
+    return shuffleElements(chemicalElements.map((el) => el.id));
+  });
+
+  // Keep track of recently served element IDs (up to 40)
+  const [recentElementIds, setRecentElementIds] = useState<string[]>([]);
+
+  // Current Element ID
+  const [currentElementId, setCurrentElementId] = useState<string>(() => {
+    const initialShuffled = shuffleElements(chemicalElements);
+    return initialShuffled[0]?.id || chemicalElements[0].id;
+  });
+
+  // Resolve active element from currentElementId and filteredPool
+  const currentElement = useMemo(() => {
+    const found = filteredPool.find((el) => el.id === currentElementId);
+    if (found) return found;
+    return filteredPool[0] || chemicalElements[0];
+  }, [filteredPool, currentElementId]);
 
   // User input selections
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
@@ -127,18 +144,124 @@ export const ElementValencyQuiz: React.FC<ElementValencyQuizProps> = ({ language
     setIsAnswerChecked(true);
   };
 
-  // Next Random Element
+  // Function to pick the next element with strict non-repetition (at least 40 turns for 54-element pool)
+  const pickNextElement = (
+    pool: ChemicalElement[],
+    currentRecent: string[],
+    currentQueue: string[]
+  ): { nextElement: ChemicalElement; newRecent: string[]; newQueue: string[] } => {
+    if (pool.length === 0) {
+      return {
+        nextElement: chemicalElements[0],
+        newRecent: currentRecent,
+        newQueue: currentQueue,
+      };
+    }
+
+    if (pool.length === 1) {
+      return {
+        nextElement: pool[0],
+        newRecent: [pool[0].id],
+        newQueue: [pool[0].id],
+      };
+    }
+
+    // Determine the safe non-repeat window:
+    // If pool has >= 41 items (e.g. all 54 elements), the non-repeat window is 40!
+    // If pool has fewer items (e.g. 10 transition metals), window is pool.length - 1 so every element is seen before any repeat.
+    const nonRepeatWindow = Math.min(40, pool.length - 1);
+
+    // Candidates in current pool that are NOT in the recent non-repeat window
+    const recentWindow = currentRecent.slice(-nonRepeatWindow);
+    const recentSet = new Set(recentWindow);
+
+    // Filter queue for valid elements in the current pool that haven't been seen recently
+    let nextId: string | undefined;
+    let remainingQueue = [...currentQueue];
+
+    // Find first item in remainingQueue that belongs to pool and not in recentSet
+    const candidateIdx = remainingQueue.findIndex(
+      (id) => !recentSet.has(id) && pool.some((el) => el.id === id)
+    );
+
+    if (candidateIdx !== -1) {
+      nextId = remainingQueue[candidateIdx];
+      remainingQueue.splice(candidateIdx, 1);
+    } else {
+      // Re-fill / shuffle pool elements that are not in recentSet
+      const eligiblePool = pool.filter((el) => !recentSet.has(el.id));
+      const candidatesToShuffle = eligiblePool.length > 0 ? eligiblePool : pool;
+      const freshlyShuffled = shuffleElements(candidatesToShuffle.map((el) => el.id));
+
+      nextId = freshlyShuffled[0];
+      remainingQueue = freshlyShuffled.slice(1);
+    }
+
+    const nextElement = pool.find((el) => el.id === nextId) || pool[0];
+    const newRecent = [...currentRecent, nextElement.id].slice(-40);
+
+    return {
+      nextElement,
+      newRecent,
+      newQueue: remainingQueue,
+    };
+  };
+
+  // Next Random Element (guaranteed no repeat within 40 turns)
   const handleNextElement = () => {
     setIsAnswerChecked(false);
     setSelectedGroup(null);
     setSelectedValencies([]);
 
-    // Pick random different element
-    let nextIdx = Math.floor(Math.random() * filteredPool.length);
-    if (filteredPool.length > 1 && nextIdx === currentElementIndex) {
-      nextIdx = (nextIdx + 1) % filteredPool.length;
+    const { nextElement, newRecent, newQueue } = pickNextElement(
+      filteredPool,
+      recentElementIds,
+      queue
+    );
+
+    setCurrentElementId(nextElement.id);
+    setRecentElementIds(newRecent);
+    setQueue(newQueue);
+  };
+
+  // Change filter handler
+  const handleFilterChange = (filterId: string) => {
+    setSelectedFilter(filterId);
+    setIsAnswerChecked(false);
+    setSelectedGroup(null);
+    setSelectedValencies([]);
+
+    // Get the target pool for this filter
+    let newPool: ChemicalElement[];
+    switch (filterId) {
+      case 'variable':
+        newPool = chemicalElements.filter((el) => el.valencies.length > 1);
+        break;
+      case 'group1_2':
+        newPool = chemicalElements.filter((el) => el.group === 1 || el.group === 2);
+        break;
+      case 'transition':
+        newPool = chemicalElements.filter((el) => el.group >= 3 && el.group <= 12);
+        break;
+      case 'p_block':
+        newPool = chemicalElements.filter((el) => el.group >= 13 && el.group <= 16);
+        break;
+      case 'halogens_noble':
+        newPool = chemicalElements.filter((el) => el.group === 17 || el.group === 18);
+        break;
+      default:
+        newPool = chemicalElements;
     }
-    setCurrentElementIndex(nextIdx);
+
+    const { nextElement, newRecent, newQueue } = pickNextElement(
+      newPool,
+      recentElementIds,
+      []
+    );
+
+    setCurrentElementId(nextElement.id);
+    setRecentElementIds(newRecent);
+    setQueue(newQueue);
   };
 
   // Reset Stats
@@ -151,6 +274,8 @@ export const ElementValencyQuiz: React.FC<ElementValencyQuizProps> = ({ language
       streak: 0,
       bestStreak: 0,
     });
+    setRecentElementIds([]);
+    setQueue(shuffleElements(chemicalElements.map((el) => el.id)));
   };
 
   // Check state calculations
@@ -191,16 +316,19 @@ export const ElementValencyQuiz: React.FC<ElementValencyQuizProps> = ({ language
               <Atom className="w-6 h-6 text-emerald-700 animate-spin-slow" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-extrabold text-emerald-950">
                   মৌলের গ্রুপ ও যোজনী কুইজ
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                   ৫৪টি নির্ধারিত মৌল
                 </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                  ৪০ বারে নো-রিপিট
+                </span>
               </div>
               <p className="text-xs text-emerald-700/80 mt-0.5">
-                র‍্যান্ডম মৌলের গ্রুপ (১-১৮) এবং এক বা একাধিক যোজনী (১-৮ ও নিষ্ক্রিয় ০) যাচাই করুন
+                র‍্যান্ডম মৌলের গ্রুপ (১-১৮) ও যোজনী যাচাই করুন (একবার আসা মৌল অন্তত ৪০ বারের মধ্যে পুনরায় আসবে না)
               </p>
             </div>
           </div>
@@ -281,14 +409,8 @@ export const ElementValencyQuiz: React.FC<ElementValencyQuizProps> = ({ language
             ].map((f) => (
               <button
                 key={f.id}
-                onClick={() => {
-                  setSelectedFilter(f.id);
-                  setIsAnswerChecked(false);
-                  setSelectedGroup(null);
-                  setSelectedValencies([]);
-                  setCurrentElementIndex(0);
-                }}
-                className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                onClick={() => handleFilterChange(f.id)}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
                   selectedFilter === f.id
                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                     : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50'
