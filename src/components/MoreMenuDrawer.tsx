@@ -198,7 +198,7 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
               <span>{language === 'bn' ? 'রসায়ন (Chemistry)' : 'Chemistry'}</span>
             </div>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold">
-              {language === 'bn' ? 'সংকেত কুইজ' : 'Quiz'}
+              {language === 'bn' ? 'গ্রুপ, যোজনী ও সংকেত' : 'Quiz'}
             </span>
           </button>
 

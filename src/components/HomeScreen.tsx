@@ -210,8 +210,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
               <p className="text-[11px] text-emerald-700/80 mt-0.5 leading-tight">
                 {language === 'bn'
-                  ? 'রাসায়নিক সংকেত কুইজ (১০-৩০ টি প্রশ্ন) ও সংকেত ভাণ্ডার'
-                  : 'Chemical Formula Quiz (10-30 Questions) & Study Sheet'}
+                  ? 'মৌলের গ্রুপ ও যোজনী কুইজ (১-১৮ ও ১-৮), রাসায়নিক সংকেত'
+                  : 'Element Group & Valency Quiz (1-18, 1-8) & Chemical Formulas'}
               </p>
             </div>
           </div>
