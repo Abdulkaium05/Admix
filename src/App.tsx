@@ -37,6 +37,7 @@ import { HistoryScreen } from './components/HistoryScreen';
 import { StudyTimeScreen } from './components/StudyTimeScreen';
 import { StudyGraphScreen } from './components/StudyGraphScreen';
 import { StudyTasksScreen } from './components/StudyTasksScreen';
+import { ChemistryScreen } from './components/ChemistryScreen';
 import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
 import { AuthScreen } from './components/AuthScreen';
 import { EngineerLogo } from './components/EngineerLogo';
@@ -471,6 +472,13 @@ export default function App() {
             onBack={() => setCurrentView('home')}
             onNavigateStudyTime={() => setCurrentView('study_time')}
             onNavigateStudyGraph={() => setCurrentView('study_graph')}
+          />
+        )}
+
+        {currentView === 'chemistry' && (
+          <ChemistryScreen
+            language={language}
+            onBack={() => setCurrentView('home')}
           />
         )}
       </main>

@@ -16,6 +16,7 @@ import {
   Award,
   CheckCircle2,
   ListTodo,
+  FlaskConical,
 } from 'lucide-react';
 
 interface HomeScreenProps {
@@ -185,6 +186,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
             <span>{t.startExam}</span>
           </button>
+        </div>
+      </div>
+
+      {/* 2.5 Chemistry (রসায়ন) Quick Access Card */}
+      <div
+        onClick={() => onNavigate('chemistry')}
+        className="p-4 sm:p-4.5 rounded-2xl sm:rounded-3xl bg-white border border-emerald-200 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer group relative overflow-hidden"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform border border-emerald-200/60">
+              <FlaskConical className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm sm:text-base font-extrabold text-emerald-950 group-hover:text-emerald-700 transition-colors">
+                  {language === 'bn' ? 'রসায়ন (Chemistry)' : 'Chemistry'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  নতুন অপশন
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-700/80 mt-0.5 leading-tight">
+                {language === 'bn'
+                  ? 'রাসায়নিক সংকেত কুইজ (১০-৩০ টি প্রশ্ন) ও সংকেত ভাণ্ডার'
+                  : 'Chemical Formula Quiz (10-30 Questions) & Study Sheet'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 text-xs font-bold text-white bg-emerald-600 group-hover:bg-emerald-700 px-3 py-2 rounded-xl transition-colors shadow-2xs flex-shrink-0">
+            <span>{language === 'bn' ? 'কুইজ দিন' : 'Start'}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
         </div>
       </div>
 

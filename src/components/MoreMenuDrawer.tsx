@@ -25,6 +25,7 @@ import {
   CalendarClock,
   LogOut,
   Cloud,
+  FlaskConical,
 } from 'lucide-react';
 
 interface MoreMenuDrawerProps {
@@ -181,6 +182,24 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
           >
             <Home className="w-4 h-4" />
             <span>হোম স্ক্রিন (Home)</span>
+          </button>
+
+          {/* Chemistry (রসায়ন) Feature */}
+          <button
+            onClick={() => handleNav('chemistry')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              currentView === 'chemistry'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-emerald-900 hover:bg-emerald-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <FlaskConical className="w-4 h-4 text-emerald-600" />
+              <span>{language === 'bn' ? 'রসায়ন (Chemistry)' : 'Chemistry'}</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold">
+              {language === 'bn' ? 'সংকেত কুইজ' : 'Quiz'}
+            </span>
           </button>
 
           {/* Study Tasks Planner Feature */}

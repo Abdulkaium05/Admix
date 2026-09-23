@@ -214,13 +214,13 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
     };
   }, [timelineData]);
 
-  // Chart Dimensions & Coordinate Math
-  const svgWidth = 800;
-  const svgHeight = 270;
-  const paddingLeft = 50;
-  const paddingRight = 35;
-  const paddingTop = 36;
-  const paddingBottom = 44;
+  // Chart Dimensions & Coordinate Math - sized to fit phone screen width without horizontal scroll
+  const svgWidth = 560;
+  const svgHeight = 240;
+  const paddingLeft = 38;
+  const paddingRight = 16;
+  const paddingTop = 26;
+  const paddingBottom = 40;
 
   const chartWidth = svgWidth - paddingLeft - paddingRight;
   const chartHeight = svgHeight - paddingTop - paddingBottom;
@@ -235,7 +235,7 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
   const points = useMemo(() => {
     const len = timelineData.length;
     // When few points (e.g. 2 points for yesterday & today), add comfortable margins so they aren't pinned to the absolute boundary
-    const sideMargin = len === 1 ? 0 : len === 2 ? 140 : len <= 4 ? 60 : 10;
+    const sideMargin = len === 1 ? 0 : len === 2 ? 80 : len <= 4 ? 36 : len <= 7 ? 16 : 8;
     const usableWidth = chartWidth - sideMargin * 2;
 
     return timelineData.map((d, index) => {
@@ -284,10 +284,10 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
   // Bar Chart Width Calculation - dynamically sizes nicely for 1-2 bars or 30 bars
   const barWidth = useMemo(() => {
     const count = points.length;
-    if (count <= 2) return 46;
-    if (count <= 7) return 32;
-    if (count <= 14) return 20;
-    return Math.max(8, Math.min(18, (chartWidth / count) * 0.72));
+    if (count <= 2) return 40;
+    if (count <= 7) return 26;
+    if (count <= 14) return 16;
+    return Math.max(6, Math.min(12, (chartWidth / count) * 0.72));
   }, [points.length, chartWidth]);
 
   // Y-Axis Grid Lines (every 1 hour or 2 hours depending on scale)
@@ -504,67 +504,69 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
           </span>
         </div>
 
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-[620px]">
-            <svg
-              key={animationKey}
-              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              className="w-full h-56 sm:h-64 overflow-visible"
-            >
-              <defs>
-                {/* Emerald Gradient for Line Graph Area */}
-                <linearGradient id="areaEmeraldGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#059669" stopOpacity="0.32" />
-                  <stop offset="60%" stopColor="#10b981" stopOpacity="0.12" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                </linearGradient>
+        {/* Responsive full-width chart container - fits phone screen width directly with no horizontal scrolling */}
+        <div className="w-full overflow-hidden">
+          <svg
+            key={animationKey}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            className="w-full h-auto max-h-60 sm:max-h-64 block select-none"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <defs>
+              {/* Emerald Gradient for Line Graph Area */}
+              <linearGradient id="areaEmeraldGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#059669" stopOpacity="0.32" />
+                <stop offset="60%" stopColor="#10b981" stopOpacity="0.12" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+              </linearGradient>
 
-                {/* Animated Clip Path for Line Graph Left-to-Right Reveal */}
-                <clipPath id={`reveal-clip-${animationKey}`}>
-                  <motion.rect
-                    x="0"
-                    y="0"
-                    height={svgHeight}
-                    initial={{ width: 0 }}
-                    animate={{ width: svgWidth }}
-                    transition={{ duration: 1.3, ease: [0.16, 1, 0.3, 1] }}
-                  />
-                </clipPath>
+              {/* Animated Clip Path for Line Graph Left-to-Right Reveal */}
+              <clipPath id={`reveal-clip-${animationKey}`}>
+                <motion.rect
+                  x="0"
+                  y="0"
+                  height={svgHeight}
+                  initial={{ width: 0 }}
+                  animate={{ width: svgWidth }}
+                  transition={{ duration: 1.3, ease: [0.16, 1, 0.3, 1] }}
+                />
+              </clipPath>
 
-                {/* Bar Gradients */}
-                <linearGradient id="barGradActive" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#059669" />
-                  <stop offset="100%" stopColor="#10b981" />
-                </linearGradient>
-                <linearGradient id="barGradToday" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#047857" />
-                  <stop offset="100%" stopColor="#065f46" />
-                </linearGradient>
-              </defs>
+              {/* Bar Gradients */}
+              <linearGradient id="barGradActive" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#059669" />
+                <stop offset="100%" stopColor="#10b981" />
+              </linearGradient>
+              <linearGradient id="barGradToday" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#047857" />
+                <stop offset="100%" stopColor="#065f46" />
+              </linearGradient>
+            </defs>
 
-              {/* Grid Lines and Y-Axis Labels */}
-              {yAxisTicks.map((tick) => (
-                <g key={`y-${tick.hour}`}>
-                  <line
-                    x1={paddingLeft}
-                    y1={tick.y}
-                    x2={svgWidth - paddingRight}
-                    y2={tick.y}
-                    stroke="#e5e7eb"
-                    strokeDasharray={tick.hour === 3 ? '4 3' : '2 2'}
-                    strokeWidth={tick.hour === 3 ? 1.5 : 1}
-                    className={tick.hour === 3 ? 'stroke-emerald-300' : ''}
-                  />
-                  <text
-                    x={paddingLeft - 8}
-                    y={tick.y + 4}
-                    textAnchor="end"
-                    className="text-[10px] font-mono fill-stone-600 font-semibold"
-                  >
-                    {tick.label}
-                  </text>
-                </g>
-              ))}
+            {/* Grid Lines and Y-Axis Labels */}
+            {yAxisTicks.map((tick) => (
+              <g key={`y-${tick.hour}`}>
+                <line
+                  x1={paddingLeft}
+                  y1={tick.y}
+                  x2={svgWidth - paddingRight}
+                  y2={tick.y}
+                  stroke="#e5e7eb"
+                  strokeDasharray={tick.hour === 3 ? '4 3' : '2 2'}
+                  strokeWidth={tick.hour === 3 ? 1.5 : 1}
+                  className={tick.hour === 3 ? 'stroke-emerald-300' : ''}
+                />
+                <text
+                  x={paddingLeft - 6}
+                  y={tick.y + 4}
+                  textAnchor="end"
+                  fontSize="11"
+                  className="font-mono fill-stone-600 font-semibold"
+                >
+                  {tick.label}
+                </text>
+              </g>
+            ))}
 
               {/* Base Axis Line */}
               <line
@@ -736,7 +738,7 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
               {/* X-Axis Date Labels (with intelligent spacing & relative tags) */}
               {points.map((pt, i) => {
                 const total = points.length;
-                const step = total <= 14 ? 1 : total > 22 ? 4 : 2;
+                const step = total <= 7 ? 1 : total <= 14 ? 2 : total <= 21 ? 3 : 5;
                 const showLabel = i % step === 0 || i === total - 1 || i === 0;
                 if (!showLabel) return null;
 
@@ -746,9 +748,10 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
                   <g key={`x-lbl-${pt.date}`}>
                     <text
                       x={pt.x}
-                      y={chartBottom + 16}
+                      y={chartBottom + 15}
                       textAnchor="middle"
-                      className={`text-[10px] font-mono select-none ${
+                      fontSize="11"
+                      className={`font-mono select-none ${
                         isSelectedDate
                           ? 'font-bold fill-emerald-950'
                           : pt.isToday
@@ -760,10 +763,11 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
                     </text>
                     <text
                       x={pt.x}
-                      y={chartBottom + 28}
+                      y={chartBottom + 27}
                       textAnchor="middle"
-                      className={`text-[8.5px] select-none font-sans ${
-                        pt.relativeLabel ? 'font-bold fill-emerald-800' : 'fill-stone-600'
+                      fontSize="9"
+                      className={`select-none font-sans ${
+                        pt.relativeLabel ? 'font-bold fill-emerald-800' : 'fill-stone-500'
                       }`}
                     >
                       {pt.relativeLabel || pt.weekday}
@@ -772,7 +776,6 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
                 );
               })}
             </svg>
-          </div>
         </div>
 
         {/* Dynamic Detail Tooltip Card on Selected or Hovered Day */}

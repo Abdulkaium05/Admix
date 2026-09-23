@@ -110,4 +110,4 @@ export interface StudyTask {
   createdAt: number;
 }
 
-export type AppView = 'home' | 'exam' | 'result' | 'import' | 'history' | 'ai_support' | 'profile' | 'study_time' | 'study_graph' | 'study_tasks';
+export type AppView = 'home' | 'exam' | 'result' | 'import' | 'history' | 'ai_support' | 'profile' | 'study_time' | 'study_graph' | 'study_tasks' | 'chemistry';
