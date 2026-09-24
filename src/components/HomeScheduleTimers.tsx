@@ -260,9 +260,26 @@ export const HomeScheduleTimers: React.FC<HomeScheduleTimersProps> = ({
 
               {/* Subject & Topic Details */}
               <div className="mb-3.5">
-                <h3 className={`text-sm sm:text-base font-extrabold truncate ${cardTheme.accentText}`}>
-                  {schedule.subject}
-                </h3>
+                {schedule.subjects && schedule.subjects.length > 1 ? (
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                    {schedule.subjects.map((sub, idx) => (
+                      <span
+                        key={idx}
+                        className={`text-xs font-black px-2 py-0.5 rounded-lg border shadow-2xs ${
+                          isExam
+                            ? 'bg-rose-100/90 text-rose-950 border-rose-300'
+                            : 'bg-emerald-100/90 text-emerald-950 border-emerald-300'
+                        }`}
+                      >
+                        {sub}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <h3 className={`text-sm sm:text-base font-extrabold truncate ${cardTheme.accentText}`}>
+                    {schedule.subject}
+                  </h3>
+                )}
                 <p className="text-xs text-slate-700 font-medium truncate mt-0.5">
                   <span className="text-slate-500">{language === 'bn' ? 'টপিক:' : 'Topic:'} </span>
                   {schedule.topic}

@@ -118,6 +118,7 @@ export interface UpcomingSchedule {
   type: ScheduleType; // 'class' (ক্লাস) | 'exam' (পরীক্ষা / মডেল টেস্ট) | 'special' (বিশেষ সেশন)
   title?: string;
   subject: string; // যেমন সিভিল ইঞ্জিনিয়ারিং, গণিত, পদার্থ, রসায়ন, ইংরেজি
+  subjects?: string[]; // মাল্টিপল সাব্জেক্ট লিস্ট
   topic: string; // যেমন সার্ভেয়িং চ্যাপ্টার ৩, ইন্টিগ্রেশন
   date: string; // YYYY-MM-DD
   time: string; // HH:mm (24-hour e.g. "10:30", "15:00")

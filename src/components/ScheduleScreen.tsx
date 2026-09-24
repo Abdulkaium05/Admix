@@ -27,7 +27,10 @@ import {
   ExternalLink,
   Edit2,
   Filter,
+  Check,
 } from 'lucide-react';
+
+const STANDARD_SUBJECTS = ['সিভিল ইঞ্জিনিয়ারিং', 'গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'ইংরেজি'];
 
 interface ScheduleScreenProps {
   language: Language;
@@ -52,7 +55,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
   // Form states
   const [editingId, setEditingId] = useState<string | null>(null);
   const [type, setType] = useState<ScheduleType>('class');
-  const [subject, setSubject] = useState<string>('সিভিল ইঞ্জিনিয়ারিং');
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['সিভিল ইঞ্জিনিয়ারিং']);
   const [customSubject, setCustomSubject] = useState<string>('');
   const [topic, setTopic] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -70,6 +73,29 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
   };
 
   const padZero = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
+
+  // Subject toggling and presets for multiple subjects
+  const toggleSubject = (subj: string) => {
+    if (selectedSubjects.includes(subj)) {
+      if (selectedSubjects.length > 1) {
+        setSelectedSubjects(selectedSubjects.filter((s) => s !== subj));
+      }
+    } else {
+      setSelectedSubjects([...selectedSubjects, subj]);
+    }
+  };
+
+  const selectAllNonDept = () => {
+    setSelectedSubjects(['গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'ইংরেজি']);
+  };
+
+  const selectAllSubjects = () => {
+    setSelectedSubjects([...STANDARD_SUBJECTS]);
+  };
+
+  const selectCivilOnly = () => {
+    setSelectedSubjects(['সিভিল ইঞ্জিনিয়ারিং']);
+  };
 
   // Load and refresh
   const loadSchedules = () => {
@@ -109,7 +135,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
   const handleOpenNewForm = () => {
     setEditingId(null);
     setType('class');
-    setSubject('সিভিল ইঞ্জিনিয়ারিং');
+    setSelectedSubjects(['সিভিল ইঞ্জিনিয়ারিং']);
     setCustomSubject('');
     setTopic('');
     setDate(new Date().toISOString().slice(0, 10));
@@ -125,14 +151,26 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
   const handleEditSchedule = (item: UpcomingSchedule) => {
     setEditingId(item.id);
     setType(item.type);
-    const standardSubjects = ['সিভিল ইঞ্জিনিয়ারিং', 'গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'ইংরেজি'];
-    if (standardSubjects.includes(item.subject)) {
-      setSubject(item.subject);
-      setCustomSubject('');
-    } else {
-      setSubject('অন্যান্য');
-      setCustomSubject(item.subject);
+
+    // Extract subjects list from item.subjects or comma-separated item.subject
+    let rawSubjects: string[] = [];
+    if (item.subjects && item.subjects.length > 0) {
+      rawSubjects = item.subjects;
+    } else if (item.subject) {
+      rawSubjects = item.subject.split(',').map((s) => s.trim()).filter(Boolean);
     }
+
+    const standardFound = rawSubjects.filter((s) => STANDARD_SUBJECTS.includes(s));
+    const customFound = rawSubjects.filter((s) => !STANDARD_SUBJECTS.includes(s));
+
+    if (customFound.length > 0) {
+      setSelectedSubjects([...standardFound, 'অন্যান্য']);
+      setCustomSubject(customFound.join(', '));
+    } else {
+      setSelectedSubjects(standardFound.length > 0 ? standardFound : ['সিভিল ইঞ্জিনিয়ারিং']);
+      setCustomSubject('');
+    }
+
     setTopic(item.topic);
     setDate(item.date);
     setTime(item.time);
@@ -148,11 +186,17 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
     e.preventDefault();
     setFormError('');
 
-    const resolvedSubject = subject === 'অন্যান্য' ? customSubject.trim() : subject;
-    if (!resolvedSubject) {
-      setFormError(language === 'bn' ? 'অনুগ্রহ করে বিষয় উল্লেখ করুন' : 'Please provide a subject');
+    // Resolve all selected subjects including custom
+    const finalSubjects = selectedSubjects
+      .map((s) => (s === 'অন্যান্য' ? customSubject.trim() : s))
+      .filter(Boolean);
+
+    if (finalSubjects.length === 0) {
+      setFormError(language === 'bn' ? 'অনুগ্রহ করে অন্তত একটি বিষয় নির্বাচন করুন' : 'Please select at least one subject');
       return;
     }
+
+    const resolvedSubject = finalSubjects.join(', ');
 
     if (!topic.trim()) {
       setFormError(language === 'bn' ? 'অনুগ্রহ করে টপিক বা অধ্যায় লিখুন' : 'Please enter a topic or chapter');
@@ -183,6 +227,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
       userId: userId || undefined,
       type,
       subject: resolvedSubject,
+      subjects: finalSubjects,
       topic: topic.trim(),
       date,
       time,
@@ -406,32 +451,89 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
               </div>
             </div>
 
-            {/* Subject Selector */}
+            {/* Subject Selector - Supports Multiple Subject Selection for Classes and Exams */}
             <div>
-              <label className="block text-xs font-bold text-emerald-900 mb-1">
-                {language === 'bn' ? 'বিষয় (Subject):' : 'Subject:'}
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
-                {['সিভিল ইঞ্জিনিয়ারিং', 'গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'ইংরেজি', 'অন্যান্য'].map((subj) => (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-emerald-950">
+                    {language === 'bn' ? 'বিষয় নির্বাচন (একাধিক সিলেক্ট করতে পারেন):' : 'Select Subjects (Multiple selection allowed):'}
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                    {language === 'bn' ? `${toBn(selectedSubjects.length)}টি বিষয়` : `${selectedSubjects.length} subjects`}
+                  </span>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1">
                   <button
-                    key={subj}
                     type="button"
-                    onClick={() => setSubject(subj)}
-                    className={`py-2 px-2.5 rounded-xl text-xs font-bold border text-center transition-all cursor-pointer ${
-                      subject === subj
-                        ? 'bg-emerald-100 text-emerald-950 border-emerald-400 font-extrabold shadow-2xs'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
+                    onClick={selectCivilOnly}
+                    className="text-[10px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200 transition-colors"
                   >
-                    {subj}
+                    সিভিল
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={selectAllNonDept}
+                    className="text-[10px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200 transition-colors"
+                  >
+                    নন-ডিপার্টমেন্ট সব
+                  </button>
+                  <button
+                    type="button"
+                    onClick={selectAllSubjects}
+                    className="text-[10px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200 transition-colors"
+                  >
+                    সব বিষয়
+                  </button>
+                </div>
               </div>
 
-              {subject === 'অন্যান্য' && (
+              {type === 'class' && (
+                <p className="text-[11px] text-emerald-700/90 mb-2 font-medium">
+                  {language === 'bn'
+                    ? '💡 একই ক্লাসে একাধিক বিষয় থাকলে (যেমন: গণিত + পদার্থ বা সিভিল + রসায়ন) সবগুলো সিলেক্ট করে রাখুন।'
+                    : '💡 If multiple subjects are covered in this class, tap to select all of them.'}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
+                {[...STANDARD_SUBJECTS, 'অন্যান্য'].map((subj) => {
+                  const isSelected = selectedSubjects.includes(subj);
+                  return (
+                    <button
+                      key={subj}
+                      type="button"
+                      onClick={() => toggleSubject(subj)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-bold border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs font-extrabold'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50/60 hover:border-emerald-300'
+                      }`}
+                    >
+                      <span className="truncate">{subj}</span>
+                      <span
+                        className={`w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 ml-1.5 border transition-colors ${
+                          isSelected
+                            ? 'bg-white text-emerald-700 border-transparent'
+                            : 'bg-slate-100 text-transparent border-slate-300'
+                        }`}
+                      >
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedSubjects.includes('অন্যান্য') && (
                 <input
                   type="text"
-                  placeholder={language === 'bn' ? 'কাস্টম বিষয়ের নাম লিখুন...' : 'Custom subject name...'}
+                  placeholder={
+                    language === 'bn'
+                      ? 'কাস্টম বিষয়ের নাম লিখুন (একাধিক থাকলে কমা দিয়ে লিখুন)...'
+                      : 'Custom subject name...'
+                  }
                   value={customSubject}
                   onChange={(e) => setCustomSubject(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-xl focus:outline-emerald-600 bg-white"
@@ -613,9 +715,26 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({
                         <span>{isExam ? 'পরীক্ষা / এক্সাম' : 'ক্লাস'}</span>
                       </span>
 
-                      <span className="text-xs font-extrabold text-emerald-950">
-                        {schedule.subject}
-                      </span>
+                      {schedule.subjects && schedule.subjects.length > 1 ? (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {schedule.subjects.map((sub, idx) => (
+                            <span
+                              key={idx}
+                              className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${
+                                isExam
+                                  ? 'bg-rose-50 text-rose-950 border-rose-200'
+                                  : 'bg-emerald-50 text-emerald-950 border-emerald-200'
+                              }`}
+                            >
+                              {sub}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-extrabold text-emerald-950">
+                          {schedule.subject}
+                        </span>
+                      )}
 
                       {countdown.status === 'in_progress' && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white animate-pulse">

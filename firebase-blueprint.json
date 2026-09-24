@@ -88,6 +88,7 @@
         "type": { "type": "string", "description": "Schedule type: class, exam, or special" },
         "title": { "type": "string", "description": "Optional schedule title" },
         "subject": { "type": "string", "description": "Subject name" },
+        "subjects": { "type": "array", "items": { "type": "string" }, "description": "Array of multiple selected subjects" },
         "topic": { "type": "string", "description": "Topic or chapter name" },
         "date": { "type": "string", "description": "Scheduled date YYYY-MM-DD" },
         "time": { "type": "string", "description": "Scheduled time HH:mm (24h)" },
