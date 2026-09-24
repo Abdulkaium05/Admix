@@ -346,42 +346,42 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
 
       {/* Sub-Navigation Switcher (Visible only inside sub-screens for quick jumping) */}
       {currentView !== 'hub' && (
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl">
+        <div className="grid grid-cols-3 gap-1 p-1 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl">
           <button
             onClick={() => setCurrentView('elements')}
-            className={`py-2 px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`py-2 px-1 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               currentView === 'elements'
-                ? 'bg-white text-emerald-900 shadow-xs border border-emerald-200'
-                : 'text-emerald-700 hover:text-emerald-900'
+                ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
+                : 'text-emerald-700 hover:text-emerald-950'
             }`}
           >
-            <Atom className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span className="truncate">গ্রুপ ও যোজনী</span>
+            <Atom className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="whitespace-nowrap">গ্রুপ ও যোজনী</span>
           </button>
           <button
             onClick={() => {
               setCurrentView('quiz');
               setQuizPhase('setup');
             }}
-            className={`py-2 px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`py-2 px-1 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               currentView === 'quiz'
-                ? 'bg-white text-emerald-900 shadow-xs border border-emerald-200'
-                : 'text-emerald-700 hover:text-emerald-900'
+                ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
+                : 'text-emerald-700 hover:text-emerald-950'
             }`}
           >
-            <Play className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span className="truncate">সংকেত কুইজ</span>
+            <Play className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="whitespace-nowrap">সংকেত কুইজ</span>
           </button>
           <button
             onClick={() => setCurrentView('formulas')}
-            className={`py-2 px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`py-2 px-1 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               currentView === 'formulas'
-                ? 'bg-white text-emerald-900 shadow-xs border border-emerald-200'
-                : 'text-emerald-700 hover:text-emerald-900'
+                ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
+                : 'text-emerald-700 hover:text-emerald-950'
             }`}
           >
-            <BookOpen className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span className="truncate">সংকেত ভাণ্ডার</span>
+            <BookOpen className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="whitespace-nowrap">সংকেত ভাণ্ডার</span>
           </button>
         </div>
       )}

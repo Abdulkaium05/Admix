@@ -428,66 +428,64 @@ export const ElementValencyQuiz: React.FC<ElementValencyQuizProps> = ({ language
   return (
     <div className="space-y-4">
       {/* Top Banner with Navigation Tabs */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-emerald-200 shadow-2xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0">
-              <Atom className="w-6 h-6 text-emerald-700 animate-spin-slow" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-extrabold text-emerald-950">
-                  মৌলের গ্রুপ, যোজনী ও পারমাণবিক সংখ্যা
-                </h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  ৫৪টি নির্ধারিত মৌল
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                  ৪০ বারে নো-রিপিট
-                </span>
-              </div>
-              <p className="text-xs text-emerald-700/80 mt-0.5">
-                মৌলের গ্রুপ (১-১৮), যোজনী (১-৮ ও ০) এবং পারমাণবিক সংখ্যা নম্বর ইনপুট দিয়ে পরীক্ষা দিন
-              </p>
-            </div>
+      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-emerald-200 shadow-2xs space-y-3.5">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0">
+            <Atom className="w-6 h-6 text-emerald-700 animate-spin-slow" />
           </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm sm:text-base font-extrabold text-emerald-950">
+                মৌলের গ্রুপ, যোজনী ও পারমাণবিক সংখ্যা
+              </h2>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                ৫৪টি নির্ধারিত মৌল
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                ৪০ বারে নো-রিপিট
+              </span>
+            </div>
+            <p className="text-xs text-emerald-700/80 mt-0.5 leading-relaxed">
+              মৌলের গ্রুপ (১-১৮), যোজনী ও পারমাণবিক সংখ্যা নম্বর ইনপুট দিয়ে পরীক্ষা দিন
+            </p>
+          </div>
+        </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-emerald-50 rounded-xl border border-emerald-200/80 self-start sm:self-auto overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('exam')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                activeTab === 'exam'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-emerald-700 hover:text-emerald-950'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5" />
-              <span>মডেল এক্সাম</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('practice')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                activeTab === 'practice'
-                  ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
-                  : 'text-emerald-700 hover:text-emerald-950'
-              }`}
-            >
-              <Play className="w-3.5 h-3.5 text-emerald-600" />
-              <span>অনুশীলন (প্র্যাকটিস)</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('table')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                activeTab === 'table'
-                  ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
-                  : 'text-emerald-700 hover:text-emerald-950'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>মৌল তালিকা (৫৪)</span>
-            </button>
-          </div>
+        {/* Mode Switcher Tabs: Responsive 3-column segmented button bar */}
+        <div className="w-full grid grid-cols-3 gap-1 p-1 bg-emerald-50 rounded-xl border border-emerald-200/80">
+          <button
+            onClick={() => setActiveTab('exam')}
+            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
+              activeTab === 'exam'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-emerald-700 hover:text-emerald-950 bg-transparent'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">মডেল এক্সাম</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('practice')}
+            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
+              activeTab === 'practice'
+                ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
+                : 'text-emerald-700 hover:text-emerald-950 bg-transparent'
+            }`}
+          >
+            <Play className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="truncate">অনুশীলন</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('table')}
+            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
+              activeTab === 'table'
+                ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
+                : 'text-emerald-700 hover:text-emerald-950 bg-transparent'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">মৌল তালিকা</span>
+          </button>
         </div>
       </div>
 
