@@ -268,10 +268,10 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
 
                 <div>
                   <h3 className="text-base sm:text-lg font-extrabold text-emerald-950 group-hover:text-emerald-700 transition-colors flex items-center gap-1.5">
-                    <span>মৌলের গ্রুপ ও যোজনী</span>
+                    <span>মৌলের গ্রুপ, যোজনী ও পারমাণবিক সংখ্যা</span>
                   </h3>
                   <p className="text-xs text-emerald-700/90 mt-1 leading-relaxed">
-                    র‍্যান্ডম মৌলের গ্রুপ সংখ্যা (১-১৮) ও পরিবর্তনশীল যোজনী (১-৮ এবং ০) একাধিক অপশন সিলেক্ট করার কুইজ। একবার আসা মৌল অন্তত ৪০ বারের মধ্যে পুনরায় আসবে না।
+                    ১০/২০/৩০ টি র‍্যান্ডম মৌলের মডেল এক্সাম। গ্রুপ ও যোজনী ঠিক হলে ১ নম্বর এবং পারমাণবিক সংখ্যা ইনপুট সঠিক হলে ১ নম্বর।
                   </p>
                 </div>
               </div>
