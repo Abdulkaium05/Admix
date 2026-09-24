@@ -23,7 +23,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import rawFirebaseConfig from '../firebase-applet-config.json';
-import { UserProfile, Question, QuizResult, StudySession } from './types';
+import { UserProfile, Question, QuizResult, StudySession, UpcomingSchedule } from './types';
 
 // Configuration: supports both FIREBASE_* and VITE_FIREBASE_* env variables (e.g. on Vercel) with fallback to firebase-applet-config.json
 const env = (import.meta.env || {}) as Record<string, string | undefined>;
@@ -497,3 +497,64 @@ export async function deleteStudySessionFromCloud(userId: string, sessionId: str
     console.warn(`[Firestore Warning] Session delete issue for ${path}:`, error);
   }
 }
+
+// ==========================================
+// Upcoming Schedules Cloud Database Operations
+// ==========================================
+
+export async function getSchedulesFromCloud(userId: string): Promise<UpcomingSchedule[]> {
+  const path = `users/${userId}/schedules`;
+  try {
+    const colRef = collection(db, 'users', userId, 'schedules');
+    const snapshot = await withTimeout(getDocs(colRef), null, 2500);
+    if (!snapshot) return [];
+    const list: UpcomingSchedule[] = [];
+    snapshot.forEach((d) => {
+      list.push(d.data() as UpcomingSchedule);
+    });
+    return list.sort((a, b) => a.scheduledAt - b.scheduledAt);
+  } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn(`[Firestore Offline] Unable to reach cloud for ${path}.`);
+      return [];
+    }
+    console.warn(`[Firestore Warning] Schedules load issue for ${path}:`, error);
+    return [];
+  }
+}
+
+export async function saveScheduleToCloud(userId: string, schedule: UpcomingSchedule): Promise<void> {
+  const path = `users/${userId}/schedules/${schedule.id}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'schedules', schedule.id);
+    await withTimeout(
+      setDoc(docRef, {
+        ...schedule,
+        userId,
+      }),
+      undefined,
+      3000
+    );
+  } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn(`[Firestore Offline] Unable to save schedule to cloud for ${path}.`);
+      return;
+    }
+    console.warn(`[Firestore Warning] Schedule save issue for ${path}:`, error);
+  }
+}
+
+export async function deleteScheduleFromCloud(userId: string, scheduleId: string): Promise<void> {
+  const path = `users/${userId}/schedules/${scheduleId}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'schedules', scheduleId);
+    await withTimeout(deleteDoc(docRef), undefined, 3000);
+  } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn(`[Firestore Offline] Unable to delete schedule from cloud for ${path}.`);
+      return;
+    }
+    console.warn(`[Firestore Warning] Schedule delete issue for ${path}:`, error);
+  }
+}
+

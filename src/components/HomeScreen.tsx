@@ -2,6 +2,7 @@ import React from 'react';
 import { UserProfile, DailyLimitInfo, AppView } from '../types';
 import { translations, Language } from '../utils/i18n';
 import { EngineerLogo } from './EngineerLogo';
+import { HomeScheduleTimers } from './HomeScheduleTimers';
 import { MAX_DAILY_EXAMS, getTodayStudyMinutes, formatDuration, getStudyTasks, getTodayDateString, getTomorrowDateString } from '../utils/storage';
 import {
   Play,
@@ -17,6 +18,7 @@ import {
   CheckCircle2,
   ListTodo,
   FlaskConical,
+  CalendarClock,
 } from 'lucide-react';
 
 interface HomeScreenProps {
@@ -95,6 +97,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <span>{t.dailyLimitWarning}</span>
         </div>
       )}
+
+      {/* Live Upcoming Class & Exam Schedules Countdown Timers (Auto-switches to next, 24h auto-delete) */}
+      <HomeScheduleTimers
+        language={language}
+        onOpenScheduleManager={() => onNavigate('schedules')}
+        onAddNewSchedule={() => onNavigate('schedules')}
+      />
 
       {/* Daily Study Time Banner - Quick Access to Study Log */}
       <div
@@ -223,8 +232,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* 3. Quick Action Buttons - 5 Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
+      {/* 3. Quick Action Buttons - 6 Cards Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 sm:gap-3">
+        {/* Class & Exam Schedule Planner */}
+        <button
+          onClick={() => onNavigate('schedules')}
+          className="p-3 sm:p-3.5 rounded-2xl bg-white border border-emerald-200/80 hover:border-emerald-400 shadow-2xs hover:shadow-xs transition-all flex flex-col items-center text-center group relative overflow-hidden"
+        >
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+            <CalendarClock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700" />
+          </div>
+          <span className="text-xs font-bold text-emerald-950 group-hover:text-emerald-700 transition-colors">
+            {language === 'bn' ? 'সিডিউল টাইমার' : 'Schedules'}
+          </span>
+          <span className="text-[10px] text-emerald-700/80 mt-0.5">
+            {language === 'bn' ? 'ক্লাস ও পরীক্ষা' : 'Class & Exam'}
+          </span>
+        </button>
+
         {/* Study Tasks Planner (New Separate Feature) */}
         <button
           onClick={() => onNavigate('study_tasks')}

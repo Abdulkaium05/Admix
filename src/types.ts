@@ -110,4 +110,34 @@ export interface StudyTask {
   createdAt: number;
 }
 
-export type AppView = 'home' | 'exam' | 'result' | 'import' | 'history' | 'ai_support' | 'profile' | 'study_time' | 'study_graph' | 'study_tasks' | 'chemistry';
+export type ScheduleType = 'class' | 'exam' | 'special';
+
+export interface UpcomingSchedule {
+  id: string;
+  userId?: string;
+  type: ScheduleType; // 'class' (ক্লাস) | 'exam' (পরীক্ষা / মডেল টেস্ট) | 'special' (বিশেষ সেশন)
+  title?: string;
+  subject: string; // যেমন সিভিল ইঞ্জিনিয়ারিং, গণিত, পদার্থ, রসায়ন, ইংরেজি
+  topic: string; // যেমন সার্ভেয়িং চ্যাপ্টার ৩, ইন্টিগ্রেশন
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm (24-hour e.g. "10:30", "15:00")
+  scheduledAt: number; // calculated epoch timestamp in milliseconds (Date + Time)
+  durationMinutes?: number; // duration in minutes (default 60)
+  locationOrLink?: string; // Room number or meet link
+  notes?: string;
+  createdAt: number;
+}
+
+export type AppView =
+  | 'home'
+  | 'exam'
+  | 'result'
+  | 'import'
+  | 'history'
+  | 'ai_support'
+  | 'profile'
+  | 'study_time'
+  | 'study_graph'
+  | 'study_tasks'
+  | 'chemistry'
+  | 'schedules';

@@ -77,6 +77,27 @@
         "createdAt": { "type": "number", "description": "Creation timestamp" }
       },
       "required": ["id", "userId", "date", "startTime", "endTime", "durationMinutes", "subject", "topic"]
+    },
+    "UpcomingSchedule": {
+      "title": "UpcomingSchedule",
+      "description": "Upcoming class, exam, subject, topic, and time schedules with countdown timers and auto-cleanup",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of schedule" },
+        "userId": { "type": "string", "description": "Auth UID of student" },
+        "type": { "type": "string", "description": "Schedule type: class, exam, or special" },
+        "title": { "type": "string", "description": "Optional schedule title" },
+        "subject": { "type": "string", "description": "Subject name" },
+        "topic": { "type": "string", "description": "Topic or chapter name" },
+        "date": { "type": "string", "description": "Scheduled date YYYY-MM-DD" },
+        "time": { "type": "string", "description": "Scheduled time HH:mm (24h)" },
+        "scheduledAt": { "type": "number", "description": "Epoch timestamp in ms for scheduled time" },
+        "durationMinutes": { "type": "number", "description": "Duration of event in minutes" },
+        "locationOrLink": { "type": "string", "description": "Room or online meet link" },
+        "notes": { "type": "string", "description": "Notes or remarks" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" }
+      },
+      "required": ["id", "userId", "type", "subject", "topic", "date", "time", "scheduledAt"]
     }
   },
   "firestore": {
@@ -95,6 +116,10 @@
     "/users/{userId}/study_sessions/{sessionId}": {
       "schema": { "$ref": "#/entities/StudySession" },
       "description": "Stores daily study routine tracker sessions"
+    },
+    "/users/{userId}/schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/UpcomingSchedule" },
+      "description": "Stores upcoming class, exam, and topic schedules with countdown timers"
     }
   }
 }

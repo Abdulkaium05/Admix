@@ -12,6 +12,9 @@ import {
   getCustomQuestions,
   saveBatchCustomQuestions,
   MAX_DAILY_EXAMS,
+  getUpcomingSchedules,
+  saveAllUpcomingSchedules,
+  purgeExpiredSchedules,
 } from './utils/storage';
 import {
   auth,
@@ -22,6 +25,9 @@ import {
   saveQuizResultToCloud,
   getQuizHistoryFromCloud,
   syncLocalAndCloudQuestions,
+  getSchedulesFromCloud,
+  saveScheduleToCloud,
+  deleteScheduleFromCloud,
 } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
@@ -38,6 +44,7 @@ import { StudyTimeScreen } from './components/StudyTimeScreen';
 import { StudyGraphScreen } from './components/StudyGraphScreen';
 import { StudyTasksScreen } from './components/StudyTasksScreen';
 import { ChemistryScreen } from './components/ChemistryScreen';
+import { ScheduleScreen } from './components/ScheduleScreen';
 import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
 import { AuthScreen } from './components/AuthScreen';
 import { EngineerLogo } from './components/EngineerLogo';
@@ -189,6 +196,25 @@ export default function App() {
             }
           } catch (e) {
             console.warn('History sync warning:', e);
+          }
+
+          // Background sync upcoming class & exam schedules (with 24-hr auto-clean)
+          try {
+            const purgedIds = purgeExpiredSchedules();
+            if (purgedIds.length > 0) {
+              purgedIds.forEach((id) => deleteScheduleFromCloud(user.uid, id).catch(() => {}));
+            }
+            const cloudSchedules = await getSchedulesFromCloud(user.uid);
+            if (!isMounted) return;
+            if (cloudSchedules && cloudSchedules.length > 0) {
+              const localList = getUpcomingSchedules();
+              const map = new Map<string, any>();
+              localList.forEach((s) => map.set(s.id, s));
+              cloudSchedules.forEach((s) => map.set(s.id, s));
+              saveAllUpcomingSchedules(Array.from(map.values()));
+            }
+          } catch (e) {
+            console.warn('Schedules sync warning:', e);
           }
         })();
       } else {
@@ -479,6 +505,20 @@ export default function App() {
           <ChemistryScreen
             language={language}
             onBack={() => setCurrentView('home')}
+          />
+        )}
+
+        {currentView === 'schedules' && (
+          <ScheduleScreen
+            language={language}
+            onBack={() => setCurrentView('home')}
+            userId={firebaseUser?.uid}
+            onSaveScheduleToCloud={async (schedule) => {
+              if (firebaseUser) await saveScheduleToCloud(firebaseUser.uid, schedule);
+            }}
+            onDeleteScheduleFromCloud={async (id) => {
+              if (firebaseUser) await deleteScheduleFromCloud(firebaseUser.uid, id);
+            }}
           />
         )}
       </main>

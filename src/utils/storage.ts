@@ -1,4 +1,4 @@
-import { UserProfile, QuizResult, Question, DailyLimitInfo, SemesterGrades, StudySession, StudyTask } from '../types';
+import { UserProfile, QuizResult, Question, DailyLimitInfo, SemesterGrades, StudySession, StudyTask, UpcomingSchedule } from '../types';
 import { defaultQuestions } from '../data/defaultQuestions';
 
 const PROFILE_KEY = 'duet_user_profile_v1';
@@ -7,6 +7,7 @@ const CUSTOM_QUESTIONS_KEY = 'duet_custom_questions_v1';
 const DAILY_LIMIT_KEY = 'duet_daily_limit_v1';
 const STUDY_SESSIONS_KEY = 'duet_study_sessions_v1';
 const STUDY_TASKS_KEY = 'duet_study_tasks_v1';
+const UPCOMING_SCHEDULES_KEY = 'duet_upcoming_schedules_v1';
 
 export const MAX_DAILY_EXAMS = 5;
 
@@ -746,3 +747,217 @@ export function moveTaskToDate(taskId: string, newDate: string): void {
     console.error('Failed to move task date', e);
   }
 }
+
+// =========================================================================
+// Upcoming Schedules (Class, Exam, Subject, Topic, Time & 24h Auto-Deletion)
+// =========================================================================
+
+export const SCHEDULE_AUTO_DELETE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours after completion
+
+/**
+ * Checks if a schedule's time ended more than 24 hours ago.
+ * A schedule is considered completed/ended at (scheduledAt + durationMinutes).
+ * If 24 hours have passed since it ended, it is expired and must be purged.
+ */
+export function isScheduleExpired(schedule: UpcomingSchedule, nowMs: number = Date.now()): boolean {
+  const durationMs = (schedule.durationMinutes || 60) * 60 * 1000;
+  const finishTime = schedule.scheduledAt + durationMs;
+  return nowMs - finishTime >= SCHEDULE_AUTO_DELETE_WINDOW_MS;
+}
+
+/**
+ * Loads all upcoming/recent schedules and automatically purges items older than 24 hours.
+ */
+export function getUpcomingSchedules(): UpcomingSchedule[] {
+  try {
+    const raw = localStorage.getItem(UPCOMING_SCHEDULES_KEY);
+    if (!raw) return [];
+    const list: UpcomingSchedule[] = JSON.parse(raw);
+    const now = Date.now();
+
+    // Auto-clean any schedule finished > 24 hours ago
+    const validList = list.filter((item) => !isScheduleExpired(item, now));
+
+    if (validList.length !== list.length) {
+      localStorage.setItem(UPCOMING_SCHEDULES_KEY, JSON.stringify(validList));
+    }
+
+    // Sort ascending by scheduled date/time
+    return validList.sort((a, b) => a.scheduledAt - b.scheduledAt);
+  } catch (e) {
+    console.error('Failed to get upcoming schedules', e);
+    return [];
+  }
+}
+
+/**
+ * Saves a new schedule or updates an existing schedule.
+ */
+export function saveUpcomingSchedule(schedule: UpcomingSchedule): void {
+  try {
+    const list = getUpcomingSchedules();
+    const index = list.findIndex((s) => s.id === schedule.id);
+    if (index >= 0) {
+      list[index] = schedule;
+    } else {
+      list.push(schedule);
+    }
+    list.sort((a, b) => a.scheduledAt - b.scheduledAt);
+    localStorage.setItem(UPCOMING_SCHEDULES_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error('Failed to save schedule', e);
+  }
+}
+
+/**
+ * Saves all schedules (used during cloud sync).
+ */
+export function saveAllUpcomingSchedules(schedules: UpcomingSchedule[]): void {
+  try {
+    const now = Date.now();
+    const valid = schedules.filter((s) => !isScheduleExpired(s, now));
+    valid.sort((a, b) => a.scheduledAt - b.scheduledAt);
+    localStorage.setItem(UPCOMING_SCHEDULES_KEY, JSON.stringify(valid));
+  } catch (e) {
+    console.error('Failed to save all schedules', e);
+  }
+}
+
+/**
+ * Deletes a schedule by ID.
+ */
+export function deleteUpcomingSchedule(scheduleId: string): void {
+  try {
+    const list = getUpcomingSchedules().filter((s) => s.id !== scheduleId);
+    localStorage.setItem(UPCOMING_SCHEDULES_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error('Failed to delete schedule', e);
+  }
+}
+
+/**
+ * Purges schedules older than 24 hours from storage and returns the deleted IDs
+ * so cloud synchronizer can also delete them from Firestore.
+ */
+export function purgeExpiredSchedules(): string[] {
+  try {
+    const raw = localStorage.getItem(UPCOMING_SCHEDULES_KEY);
+    if (!raw) return [];
+    const list: UpcomingSchedule[] = JSON.parse(raw);
+    const now = Date.now();
+
+    const expiredIds: string[] = [];
+    const validList: UpcomingSchedule[] = [];
+
+    for (const item of list) {
+      if (isScheduleExpired(item, now)) {
+        expiredIds.push(item.id);
+      } else {
+        validList.push(item);
+      }
+    }
+
+    if (expiredIds.length > 0) {
+      localStorage.setItem(UPCOMING_SCHEDULES_KEY, JSON.stringify(validList));
+    }
+
+    return expiredIds;
+  } catch (e) {
+    console.error('Failed to purge expired schedules', e);
+    return [];
+  }
+}
+
+/**
+ * Finds the nearest active schedule(s) for the Homepage timer widget:
+ * 1. Filter out schedules that have already concluded (scheduledAt + duration < now).
+ * 2. If one has ended, the next upcoming schedule starts its timer.
+ * 3. If there are 2 (or more) schedules on that SAME nearest day, returns all of them!
+ */
+export function getNearestSchedulesForHome(nowMs: number = Date.now()): UpcomingSchedule[] {
+  const all = getUpcomingSchedules();
+  // An item is active if its end time is still in the future or within 10 minutes of scheduled start
+  const activeSchedules = all.filter((s) => {
+    const durationMs = (s.durationMinutes || 60) * 60 * 1000;
+    const finishTime = s.scheduledAt + durationMs;
+    return finishTime > nowMs;
+  });
+
+  if (activeSchedules.length === 0) {
+    return [];
+  }
+
+  // Find the date of the very first upcoming schedule
+  const earliest = activeSchedules[0];
+  const targetDate = earliest.date;
+
+  // Return all schedules occurring on this same date
+  const sameDaySchedules = activeSchedules.filter((s) => s.date === targetDate);
+  return sameDaySchedules;
+}
+
+/**
+ * Live Countdown calculation for a schedule
+ */
+export interface ScheduleCountdownResult {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  totalSecondsRemaining: number;
+  status: 'upcoming' | 'in_progress' | 'ended';
+  timeUntilEndSeconds?: number;
+}
+
+export function calculateScheduleCountdown(
+  schedule: UpcomingSchedule,
+  nowMs: number = Date.now()
+): ScheduleCountdownResult {
+  const durationMs = (schedule.durationMinutes || 60) * 60 * 1000;
+  const finishTime = schedule.scheduledAt + durationMs;
+
+  if (nowMs < schedule.scheduledAt) {
+    // Upcoming: countdown to start
+    const diffMs = schedule.scheduledAt - nowMs;
+    const totalSecs = Math.max(0, Math.floor(diffMs / 1000));
+    const days = Math.floor(totalSecs / 86400);
+    const hours = Math.floor((totalSecs % 86400) / 3600);
+    const minutes = Math.floor((totalSecs % 3600) / 60);
+    const seconds = totalSecs % 60;
+    return {
+      days,
+      hours,
+      minutes,
+      seconds,
+      totalSecondsRemaining: totalSecs,
+      status: 'upcoming',
+    };
+  } else if (nowMs <= finishTime) {
+    // In progress right now
+    const diffMs = finishTime - nowMs;
+    const totalSecs = Math.max(0, Math.floor(diffMs / 1000));
+    const hours = Math.floor(totalSecs / 3600);
+    const minutes = Math.floor((totalSecs % 3600) / 60);
+    const seconds = totalSecs % 60;
+    return {
+      days: 0,
+      hours,
+      minutes,
+      seconds,
+      totalSecondsRemaining: 0,
+      timeUntilEndSeconds: totalSecs,
+      status: 'in_progress',
+    };
+  } else {
+    // Ended
+    return {
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+      totalSecondsRemaining: 0,
+      status: 'ended',
+    };
+  }
+}
+
