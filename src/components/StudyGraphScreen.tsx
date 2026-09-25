@@ -7,6 +7,8 @@ import {
   deleteStudySession,
   calculateStudyDurationMinutes,
   formatDuration,
+  extractSessionSubjects,
+  calculateSubjectWiseStudyTime,
 } from '../utils/storage';
 import { Language } from '../utils/i18n';
 import {
@@ -23,6 +25,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  Tag,
+  FileText,
+  Hourglass,
 } from 'lucide-react';
 
 interface StudyGraphScreenProps {
@@ -135,24 +140,12 @@ export const StudyGraphScreen: React.FC<StudyGraphScreenProps> = ({
     }
   };
 
-  // Compute subject-wise breakdown for all recorded sessions
+  // Compute subject-wise breakdown for all recorded sessions - equally divides session duration among subjects
   const subjectStats = useMemo(() => {
-    const map = new Map<string, number>();
-    sessions.forEach((s) => {
-      const subj = s.subject?.trim() || (language === 'bn' ? 'অন্যান্য' : 'Other');
-      map.set(subj, (map.get(subj) || 0) + s.durationMinutes);
-    });
-
-    const entries = Array.from(map.entries())
-      .map(([sub, minutes]) => ({ subject: sub, minutes }))
-      .sort((a, b) => b.minutes - a.minutes);
-
-    const totalAllMinutes = entries.reduce((acc, curr) => acc + curr.minutes, 0);
-
-    return {
-      entries: entries.slice(0, 5),
-      totalAllMinutes,
-    };
+    return calculateSubjectWiseStudyTime(
+      sessions,
+      language === 'bn' ? 'অন্যান্য' : 'Other'
+    );
   }, [sessions, language]);
 
   // Selected date sessions
@@ -293,43 +286,86 @@ export const StudyGraphScreen: React.FC<StudyGraphScreenProps> = ({
             </button>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {selectedDateSessions.map((item, idx) => (
-              <div
-                key={item.id ? `${item.id}-${idx}` : `sess-${idx}`}
-                className="p-3 sm:p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors flex items-start justify-between gap-3"
-              >
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-mono font-bold bg-white border border-emerald-200 text-emerald-950 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
-                      <Clock className="w-3 h-3 text-emerald-600" />
-                      <span>{item.startTime} - {item.endTime}</span>
-                      <span className="text-emerald-700/70 font-sans">({formatDuration(item.durationMinutes, language)})</span>
-                    </span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900">
-                      {item.subject}
-                    </span>
+          <div className="space-y-3">
+            {selectedDateSessions.map((item, idx) => {
+              const subs = extractSessionSubjects(item);
+              const perSubMins = Math.round(item.durationMinutes / (subs.length || 1));
+
+              return (
+                <div
+                  key={item.id ? `${item.id}-${idx}` : `sess-${idx}`}
+                  className="p-3.5 sm:p-4 rounded-2xl border border-emerald-100 bg-white hover:border-emerald-300/80 shadow-2xs hover:shadow-xs transition-all space-y-2.5"
+                >
+                  {/* Top Bar: Time, Duration & Actions */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-950 border border-emerald-200/90 text-xs font-mono font-bold shadow-2xs">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>{item.startTime} - {item.endTime}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-2xs font-sans">
+                        <Hourglass className="w-3 h-3 text-emerald-100" />
+                        <span>{formatDuration(item.durationMinutes, language)}</span>
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSession(item.id)}
+                      className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                      title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
-                    {item.topic}
-                  </h4>
+
+                  {/* Topic / What was studied */}
+                  <div className="flex items-start gap-2">
+                    <div className="w-6 h-6 rounded-md bg-emerald-100/60 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <h4 className="text-xs sm:text-sm font-bold text-emerald-950 leading-snug">
+                      {item.topic}
+                    </h4>
+                  </div>
+
+                  {/* Subject Badges with Equal Division indication */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    {subs.map((subName, sIdx) => (
+                      <span
+                        key={sIdx}
+                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border bg-emerald-50 text-emerald-900 border-emerald-200 shadow-2xs"
+                      >
+                        <Tag className="w-3 h-3 text-emerald-600 opacity-80" />
+                        <span>{subName}</span>
+                        {subs.length > 1 && (
+                          <span className="text-emerald-700 font-mono font-semibold text-[11px] ml-0.5">
+                            ({formatDuration(perSubMins, language)})
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                    {subs.length > 1 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        <span>{language === 'bn' ? `${subs.length} বিষয়ে সমান বণ্টন` : `Split equally (${subs.length} subjects)`}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Optional Notes */}
                   {item.notes && (
-                    <p className="text-xs text-emerald-800/80 bg-white/70 p-2 rounded-lg border border-emerald-100/70">
-                      <span className="font-semibold">{language === 'bn' ? 'নোট: ' : 'Note: '}</span>
-                      {item.notes}
-                    </p>
+                    <div className="text-xs text-stone-700 bg-emerald-50/40 p-2.5 rounded-xl border border-emerald-100/70 flex items-start gap-2">
+                      <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-emerald-950 mr-1">{language === 'bn' ? 'নোট:' : 'Note:'}</span>
+                        <span>{item.notes}</span>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <button
-                  onClick={() => handleDeleteSession(item.id)}
-                  className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0"
-                  title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -338,44 +374,46 @@ export const StudyGraphScreen: React.FC<StudyGraphScreenProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Top Subjects Breakdown */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100 shadow-2xs md:col-span-2">
-          <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-emerald-100/70">
             <h3 className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-emerald-600" />
               <span>{language === 'bn' ? 'বিষয়ভিত্তিক স্টাডি টাইম বণ্টন' : 'Subject-wise Study Time'}</span>
             </h3>
-            <span className="text-[11px] text-emerald-700 font-mono font-bold">
-              {formatDuration(subjectStats.totalAllMinutes, language)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md font-semibold">
+                {language === 'bn' ? 'মাল্টিপল বিষয়ে সমান বণ্টন' : 'Equally divided'}
+              </span>
+              <span className="text-xs text-emerald-900 font-mono font-bold bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                {formatDuration(subjectStats.totalAllMinutes, language)}
+              </span>
+            </div>
           </div>
 
           {subjectStats.entries.length > 0 ? (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {subjectStats.entries.map((item, idx) => {
-                const percent =
-                  subjectStats.totalAllMinutes > 0
-                    ? Math.round((item.minutes / subjectStats.totalAllMinutes) * 100)
-                    : 0;
+                const percent = item.percentage;
 
                 return (
-                  <div key={item.subject} className="space-y-1">
+                  <div key={item.subject} className="space-y-1.5 p-2 rounded-xl hover:bg-emerald-50/30 transition-colors">
                     <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center font-mono border border-emerald-200">
                           {idx + 1}
                         </span>
-                        <span className="font-semibold text-emerald-950">{item.subject}</span>
+                        <span className="font-bold text-emerald-950">{item.subject}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-emerald-900 font-bold">
+                        <span className="font-mono text-emerald-900 font-bold bg-white px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
                           {formatDuration(item.minutes, language)}
                         </span>
-                        <span className="text-[11px] text-stone-600 font-mono">({percent}%)</span>
+                        <span className="text-[11px] text-emerald-700 font-mono font-bold">({percent}%)</span>
                       </div>
                     </div>
                     {/* Progress Bar */}
-                    <div className="w-full h-2 rounded-full bg-emerald-50 overflow-hidden border border-emerald-100">
+                    <div className="w-full h-2.5 rounded-full bg-emerald-50 overflow-hidden border border-emerald-100">
                       <div
-                        className="h-full rounded-full bg-emerald-600 transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-500"
                         style={{ width: `${percent}%` }}
                       />
                     </div>

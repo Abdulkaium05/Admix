@@ -351,6 +351,63 @@ export function extractSessionSubjects(session: { subject?: string; subjects?: s
   return session.subject ? [session.subject.trim()] : ['সিভিল ইঞ্জিনিয়ারিং'];
 }
 
+export interface SubjectDistributionEntry {
+  subject: string;
+  minutes: number;
+  percentage: number;
+}
+
+export interface SubjectDistributionStats {
+  entries: SubjectDistributionEntry[];
+  totalAllMinutes: number;
+}
+
+/**
+ * Computes subject-wise study time distribution.
+ * If a session has multiple subjects (e.g. 1h 30m with 3 subjects),
+ * the session duration is divided equally among the subjects (e.g. 30m each).
+ */
+export function calculateSubjectWiseStudyTime(
+  sessionsList: StudySession[],
+  fallbackSubject = 'অন্যান্য'
+): SubjectDistributionStats {
+  const map = new Map<string, number>();
+  let totalAllMinutes = 0;
+
+  for (const s of sessionsList) {
+    const duration = s.durationMinutes || 0;
+    if (duration <= 0) continue;
+    totalAllMinutes += duration;
+
+    const subjects = extractSessionSubjects(s);
+    const activeSubjects = subjects.length > 0 ? subjects : [fallbackSubject];
+    const splitMinutes = duration / activeSubjects.length;
+
+    for (const subj of activeSubjects) {
+      const cleanSubj = subj.trim();
+      map.set(cleanSubj, (map.get(cleanSubj) || 0) + splitMinutes);
+    }
+  }
+
+  const entries: SubjectDistributionEntry[] = Array.from(map.entries())
+    .map(([subject, rawMins]) => {
+      const minutes = Math.round(rawMins);
+      const percentage = totalAllMinutes > 0 ? Math.round((minutes / totalAllMinutes) * 100) : 0;
+      return {
+        subject,
+        minutes,
+        percentage,
+      };
+    })
+    .filter((e) => e.minutes > 0)
+    .sort((a, b) => b.minutes - a.minutes);
+
+  return {
+    entries,
+    totalAllMinutes,
+  };
+}
+
 export function deleteStudySession(sessionId: string): void {
   try {
     const list = getStudySessions().filter((s) => s.id !== sessionId);

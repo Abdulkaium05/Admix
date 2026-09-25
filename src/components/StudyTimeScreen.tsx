@@ -10,6 +10,7 @@ import {
   calculateStudyDurationMinutes,
   formatDuration,
   extractSessionSubjects,
+  calculateSubjectWiseStudyTime,
 } from '../utils/storage';
 import { Language } from '../utils/i18n';
 import {
@@ -35,6 +36,9 @@ import {
   Pencil,
   X,
   Layers,
+  Tag,
+  Hourglass,
+  FileText,
 } from 'lucide-react';
 import { auth, saveStudySessionToCloud, deleteStudySessionFromCloud } from '../firebase';
 
@@ -370,6 +374,17 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
   const selectedDateSessions = sessions.filter((s) => s.date === selectedDate);
   const selectedDateTotalMinutes = selectedDateSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
 
+  // Subject-wise Study Time calculations (divides session duration equally among multiple subjects)
+  const selectedDateSubjectStats = calculateSubjectWiseStudyTime(
+    selectedDateSessions,
+    language === 'bn' ? 'অন্যান্য' : 'Other'
+  );
+
+  const allHistorySubjectStats = calculateSubjectWiseStudyTime(
+    sessions,
+    language === 'bn' ? 'অন্যান্য' : 'Other'
+  );
+
   // Group all sessions by date for history
   const sessionsByDate: Record<string, StudySession[]> = {};
   sessions.forEach((s) => {
@@ -381,6 +396,104 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
 
   const allDates = Object.keys(sessionsByDate).sort((a, b) => b.localeCompare(a));
   const totalAllMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+
+  // Render polished modern card for a study session
+  const renderPolishedSessionCard = (session: StudySession, idx: number) => {
+    const subs = extractSessionSubjects(session);
+    const perSubMins = Math.round((session.durationMinutes || 0) / (subs.length || 1));
+
+    return (
+      <div
+        key={session.id ? `${session.id}-${idx}` : `sess-${idx}`}
+        className="p-3.5 sm:p-4 rounded-2xl border border-emerald-100 bg-white hover:border-emerald-300/80 shadow-2xs hover:shadow-xs transition-all space-y-2.5"
+      >
+        {/* Top Bar: Time, Duration & Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-950 border border-emerald-200/90 text-xs font-mono font-bold shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>{session.startTime} - {session.endTime}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-2xs font-sans">
+              <Hourglass className="w-3 h-3 text-emerald-100" />
+              <span>{formatDuration(session.durationMinutes, language)}</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleOpenEdit(session)}
+              className="px-2.5 py-1 text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100/80 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold border border-emerald-200 shadow-2xs"
+              title={language === 'bn' ? 'পড়ার হিস্ট্রি এডিট করুন' : 'Edit study session'}
+              aria-label="Edit session"
+            >
+              <Pencil className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{language === 'bn' ? 'এডিট' : 'Edit'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDelete(session.id)}
+              className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+              title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+              aria-label="Delete session"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Topic Title */}
+        <div className="flex items-start gap-2">
+          <div className="w-6 h-6 rounded-md bg-emerald-100/60 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+            <BookOpen className="w-3.5 h-3.5" />
+          </div>
+          <h4 className="text-xs sm:text-sm font-bold text-emerald-950 leading-snug">
+            {session.topic}
+          </h4>
+        </div>
+
+        {/* Subject Badges with Equal Time Distribution */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          {subs.map((subName, sIdx) => {
+            const preset = PRESET_SUBJECTS.find((p) => p.nameBn === subName || p.nameEn === subName);
+            const colorClass = preset?.color || 'bg-emerald-50 text-emerald-900 border-emerald-200';
+            return (
+              <span
+                key={sIdx}
+                className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border ${colorClass} shadow-2xs`}
+              >
+                <Tag className="w-3 h-3 text-emerald-700 opacity-80" />
+                <span>{subName}</span>
+                {subs.length > 1 && (
+                  <span className="text-emerald-800 font-mono font-semibold text-[11px] ml-0.5">
+                    ({formatDuration(perSubMins, language)})
+                  </span>
+                )}
+              </span>
+            );
+          })}
+          {subs.length > 1 && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+              <Sparkles className="w-3 h-3 text-emerald-600" />
+              <span>{language === 'bn' ? `${subs.length} বিষয়ে সমান বণ্টন` : `Split equally (${subs.length} subjects)`}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Optional Notes */}
+        {session.notes && (
+          <div className="text-xs text-stone-700 bg-emerald-50/40 p-2.5 rounded-xl border border-emerald-100/70 flex items-start gap-2">
+            <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-emerald-950 mr-1">{language === 'bn' ? 'নোট:' : 'Note:'}</span>
+              <span>{session.notes}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Helper date navigation
   const shiftDate = (days: number) => {
@@ -1126,73 +1239,72 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              {selectedDateSessions.map((item, idx) => (
-                <div
-                  key={item.id ? `${item.id}-${idx}` : `sess-${idx}`}
-                  className="p-3.5 sm:p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors flex items-start justify-between gap-3"
-                >
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    {/* Time badge & Subject Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs font-mono font-bold bg-white border border-emerald-200 text-emerald-950 px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
-                        <Clock className="w-3 h-3 text-emerald-600" />
-                        <span>{item.startTime} - {item.endTime}</span>
-                        <span className="text-emerald-700/60 font-sans">({formatDuration(item.durationMinutes, language)})</span>
+            <div className="space-y-4">
+              {/* Daily Subject Distribution Card */}
+              {selectedDateSubjectStats.entries.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-100 shadow-2xs space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-emerald-100/70">
+                    <h3 className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-emerald-600" />
+                      <span>{language === 'bn' ? 'এই দিনের বিষয়ভিত্তিক স্টাডি টাইম বণ্টন' : 'Subject-wise Study Time for this Date'}</span>
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md font-semibold">
+                        {language === 'bn' ? 'সমান ভাগে বণ্টন' : 'Equally divided'}
                       </span>
-
-                      {extractSessionSubjects(item).map((subName, sIdx) => {
-                        const preset = PRESET_SUBJECTS.find((p) => p.nameBn === subName || p.nameEn === subName);
-                        const colorClass = preset?.color || 'bg-emerald-100 text-emerald-900 border-emerald-300';
-                        return (
-                          <span
-                            key={sIdx}
-                            className={`text-xs font-bold px-2 py-0.5 rounded-md border ${colorClass} shadow-2xs`}
-                          >
-                            {subName}
-                          </span>
-                        );
-                      })}
+                      <span className="text-xs text-emerald-900 font-mono font-bold bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                        {formatDuration(selectedDateSubjectStats.totalAllMinutes, language)}
+                      </span>
                     </div>
-
-                    {/* What was studied */}
-                    <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
-                      {item.topic}
-                    </h4>
-
-                    {/* Optional Note */}
-                    {item.notes && (
-                      <p className="text-xs text-emerald-800/80 bg-white/80 p-2 rounded-lg border border-emerald-100/70">
-                        <span className="font-semibold">{language === 'bn' ? 'নোট: ' : 'Note: '}</span>
-                        {item.notes}
-                      </p>
-                    )}
                   </div>
 
-                  {/* Actions: Edit & Delete buttons */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(item)}
-                      className="px-2 py-1 text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100/60 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold border border-emerald-200/80 bg-white shadow-2xs"
-                      title={language === 'bn' ? 'পড়ার হিস্ট্রি এডিট করুন' : 'Edit study session'}
-                      aria-label="Edit session"
-                    >
-                      <Pencil className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{language === 'bn' ? 'এডিট' : 'Edit'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                      title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
-                      aria-label="Delete session"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                  <div className="space-y-2.5">
+                    {selectedDateSubjectStats.entries.map((item, idx) => {
+                      const percent = item.percentage;
+                      return (
+                        <div key={item.subject} className="space-y-1.5 p-2 rounded-xl hover:bg-emerald-50/30 transition-colors">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center font-mono border border-emerald-200">
+                                {idx + 1}
+                              </span>
+                              <span className="font-bold text-emerald-950">{item.subject}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-emerald-900 font-bold bg-white px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+                                {formatDuration(item.minutes, language)}
+                              </span>
+                              <span className="text-[11px] text-emerald-700 font-mono font-bold">({percent}%)</span>
+                            </div>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="w-full h-2 rounded-full bg-emerald-50 overflow-hidden border border-emerald-100">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-500"
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Sessions List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-emerald-600" />
+                    <span>{language === 'bn' ? 'পড়ার সেশন হিস্ট্রি' : 'Study Sessions Log'}</span>
+                    <span className="text-[11px] font-mono text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                      ({selectedDateSessions.length})
+                    </span>
+                  </h3>
+                </div>
+
+                {selectedDateSessions.map((item, idx) => renderPolishedSessionCard(item, idx))}
+              </div>
             </div>
           )}
         </div>
@@ -1238,6 +1350,51 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
             </div>
           </div>
 
+          {/* Overall Subject-wise Distribution Summary */}
+          {allHistorySubjectStats.entries.length > 0 && (
+            <div className="bg-white rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-2xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-emerald-100/70">
+                <h3 className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <span>{language === 'bn' ? 'সর্বমোট বিষয়ভিত্তিক পড়ার সময়' : 'Overall Subject-wise Study Time'}</span>
+                </h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md font-semibold">
+                    {language === 'bn' ? 'সেশন সময় সমান ভাগে বণ্টন' : 'Equally split'}
+                  </span>
+                  <span className="text-xs text-emerald-900 font-mono font-bold bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                    {formatDuration(allHistorySubjectStats.totalAllMinutes, language)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {allHistorySubjectStats.entries.map((item, idx) => (
+                  <div key={item.subject} className="p-2.5 rounded-xl border border-emerald-100 bg-emerald-50/20 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center font-mono border border-emerald-200">
+                          {idx + 1}
+                        </span>
+                        <span>{item.subject}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 font-mono">
+                        <span className="font-bold text-emerald-900">{formatDuration(item.minutes, language)}</span>
+                        <span className="text-[11px] text-emerald-700 font-bold">({item.percentage}%)</span>
+                      </div>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-emerald-100/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-emerald-600 transition-all duration-500"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {allDates.length === 0 ? (
             <div className="bg-white rounded-2xl border border-emerald-100 p-8 text-center space-y-3">
               <Clock className="w-10 h-10 text-emerald-600 mx-auto" />
@@ -1268,83 +1425,28 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
               return (
                 <div
                   key={dateStr}
-                  className="bg-white rounded-2xl border border-emerald-100 overflow-hidden shadow-2xs"
+                  className="bg-white rounded-2xl border border-emerald-100 overflow-hidden shadow-2xs space-y-0"
                 >
                   {/* Date Header Banner */}
-                  <div className="p-3.5 sm:p-4 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between">
+                  <div className="p-3.5 sm:p-4 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-emerald-700" />
                       <span className="text-xs sm:text-sm font-bold text-emerald-950">
                         {formatDateDisplay(dateStr)}
                       </span>
+                      <span className="text-[11px] font-mono font-semibold text-emerald-800 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                        {daySessions.length} {language === 'bn' ? 'টি সেশন' : 'sessions'}
+                      </span>
                     </div>
-                    <span className="text-xs sm:text-sm font-bold text-emerald-800 font-mono bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
+                    <span className="text-xs sm:text-sm font-bold text-emerald-800 font-mono bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
                       {language === 'bn' ? 'মোট: ' : 'Total: '}
                       {formatDuration(dayTotalMins, language)}
                     </span>
                   </div>
 
-                    {/* Day Sessions List */}
-                  <div className="divide-y divide-emerald-50 p-2 sm:p-3 space-y-2">
-                    {daySessions.map((session, sIdx) => (
-                      <div
-                        key={session.id ? `${session.id}-${sIdx}` : `day-sess-${sIdx}`}
-                        className="p-3 rounded-xl hover:bg-emerald-50/30 transition-colors flex items-start justify-between gap-2"
-                      >
-                        <div className="space-y-1 flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-mono font-semibold text-emerald-900 bg-emerald-100/70 px-2 py-0.5 rounded-md">
-                              {session.startTime} - {session.endTime} ({formatDuration(session.durationMinutes, language)})
-                            </span>
-                            {extractSessionSubjects(session).map((subName, subIdx) => {
-                              const preset = PRESET_SUBJECTS.find((p) => p.nameBn === subName || p.nameEn === subName);
-                              const colorClass = preset?.color || 'bg-emerald-100 text-emerald-900 border-emerald-300';
-                              return (
-                                <span
-                                  key={subIdx}
-                                  className={`text-xs font-bold px-2 py-0.5 rounded-md border ${colorClass} shadow-2xs`}
-                                >
-                                  {subName}
-                                </span>
-                              );
-                            })}
-                          </div>
-
-                          <p className="text-xs sm:text-sm font-bold text-emerald-950">
-                            {session.topic}
-                          </p>
-
-                          {session.notes && (
-                            <p className="text-xs text-emerald-700/80 italic">
-                              {session.notes}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Actions: Edit & Delete buttons */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(session)}
-                            className="px-2 py-1 text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100/60 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold border border-emerald-200/80 bg-white shadow-2xs"
-                            title={language === 'bn' ? 'পড়ার হিস্ট্রি এডিট করুন' : 'Edit study session'}
-                            aria-label="Edit session"
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>{language === 'bn' ? 'এডিট' : 'Edit'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(session.id)}
-                            className="p-1.5 text-stone-400 hover:text-rose-600 rounded-lg transition-colors"
-                            title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
-                            aria-label="Delete session"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                  {/* Day Sessions List */}
+                  <div className="p-3 sm:p-4 space-y-3 bg-stone-50/30">
+                    {daySessions.map((session, sIdx) => renderPolishedSessionCard(session, sIdx))}
                   </div>
                 </div>
               );
