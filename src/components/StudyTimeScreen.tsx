@@ -3,11 +3,13 @@ import { StudySession } from '../types';
 import {
   getStudySessions,
   saveStudySession,
+  updateStudySession,
   deleteStudySession,
   clearAllStudySessions,
   resetSampleStudySessions,
   calculateStudyDurationMinutes,
   formatDuration,
+  extractSessionSubjects,
 } from '../utils/storage';
 import { Language } from '../utils/i18n';
 import {
@@ -30,26 +32,33 @@ import {
   RefreshCw,
   Check,
   ListTodo,
+  Pencil,
+  X,
+  Layers,
 } from 'lucide-react';
+import { auth, saveStudySessionToCloud, deleteStudySessionFromCloud } from '../firebase';
 
 interface StudyTimeScreenProps {
   language: Language;
+  userId?: string;
   onNavigateHome?: () => void;
   onNavigateGraph?: () => void;
   onNavigateTasks?: () => void;
 }
 
-const PRESET_SUBJECTS = [
+export const PRESET_SUBJECTS = [
   { id: 'civil', nameBn: 'সিভিল ইঞ্জিনিয়ারিং', nameEn: 'Civil Engineering', color: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
   { id: 'math', nameBn: 'গণিত (Mathematics)', nameEn: 'Mathematics', color: 'bg-blue-100 text-blue-900 border-blue-300' },
   { id: 'physics', nameBn: 'পদার্থবিজ্ঞান (Physics)', nameEn: 'Physics', color: 'bg-indigo-100 text-indigo-900 border-indigo-300' },
   { id: 'chemistry', nameBn: 'রসায়ন (Chemistry)', nameEn: 'Chemistry', color: 'bg-amber-100 text-amber-900 border-amber-300' },
   { id: 'english', nameBn: 'ইংরেজি (English)', nameEn: 'English', color: 'bg-purple-100 text-purple-900 border-purple-300' },
+  { id: 'handwriting', nameBn: 'হ্যান্ডরাইটিং প্র্যাকটিস (Handwriting Practice)', nameEn: 'Handwriting Practice', color: 'bg-rose-100 text-rose-900 border-rose-300' },
   { id: 'other', nameBn: 'অন্যান্য / সাধারণ প্রস্তুতি', nameEn: 'General / Other', color: 'bg-stone-100 text-stone-900 border-stone-300' },
 ];
 
 export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
   language,
+  userId,
   onNavigateHome,
   onNavigateGraph,
   onNavigateTasks,
@@ -62,22 +71,34 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
   // Tab: 'daily' | 'all_history' | 'timer'
   const [activeTab, setActiveTab] = useState<'daily' | 'all_history' | 'timer'>('daily');
 
-  // Form State
+  // Form State (Multi-subject support)
   const [sessionDate, setSessionDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState<string>('06:00');
   const [endTime, setEndTime] = useState<string>('09:00');
-  const [subject, setSubject] = useState<string>('সিভিল ইঞ্জিনিয়ারিং');
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['সিভিল ইঞ্জিনিয়ারিং']);
+  const [customSubjectInput, setCustomSubjectInput] = useState<string>('');
   const [topic, setTopic] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [formSuccess, setFormSuccess] = useState<boolean>(false);
   const [isAddingOpen, setIsAddingOpen] = useState<boolean>(false);
 
-  // Live Timer State
+  // Live Timer State (Multi-subject support)
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
-  const [timerSubject, setTimerSubject] = useState<string>('সিভিল ইঞ্জিনিয়ারিং');
+  const [timerSubjects, setTimerSubjects] = useState<string[]>(['সিভিল ইঞ্জিনিয়ারিং']);
   const [timerTopic, setTimerTopic] = useState<string>('');
   const [timerStartTimeStr, setTimerStartTimeStr] = useState<string>('');
+
+  // History Edit Modal State
+  const [editingSession, setEditingSession] = useState<StudySession | null>(null);
+  const [editDate, setEditDate] = useState<string>('');
+  const [editStartTime, setEditStartTime] = useState<string>('06:00');
+  const [editEndTime, setEditEndTime] = useState<string>('09:00');
+  const [editSubjects, setEditSubjects] = useState<string[]>(['সিভিল ইঞ্জিনিয়ারিং']);
+  const [editCustomSubject, setEditCustomSubject] = useState<string>('');
+  const [editTopic, setEditTopic] = useState<string>('');
+  const [editNotes, setEditNotes] = useState<string>('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     loadSessions();
@@ -101,6 +122,54 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
     setSessions(data);
   };
 
+  const toggleFormSubject = (subName: string) => {
+    setSelectedSubjects((prev) => {
+      if (prev.includes(subName)) {
+        if (prev.length <= 1) return prev; // keep at least one subject
+        return prev.filter((s) => s !== subName);
+      }
+      return [...prev, subName];
+    });
+  };
+
+  const handleAddCustomFormSubject = () => {
+    const trimmed = customSubjectInput.trim();
+    if (!trimmed) return;
+    if (!selectedSubjects.includes(trimmed)) {
+      setSelectedSubjects((prev) => [...prev, trimmed]);
+    }
+    setCustomSubjectInput('');
+  };
+
+  const toggleTimerSubject = (subName: string) => {
+    setTimerSubjects((prev) => {
+      if (prev.includes(subName)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((s) => s !== subName);
+      }
+      return [...prev, subName];
+    });
+  };
+
+  const toggleEditSubject = (subName: string) => {
+    setEditSubjects((prev) => {
+      if (prev.includes(subName)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((s) => s !== subName);
+      }
+      return [...prev, subName];
+    });
+  };
+
+  const handleAddCustomEditSubject = () => {
+    const trimmed = editCustomSubject.trim();
+    if (!trimmed) return;
+    if (!editSubjects.includes(trimmed)) {
+      setEditSubjects((prev) => [...prev, trimmed]);
+    }
+    setEditCustomSubject('');
+  };
+
   const handleSaveSession = (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim()) {
@@ -114,19 +183,27 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
       return;
     }
 
+    const finalSubjects = selectedSubjects.length > 0 ? selectedSubjects : ['সিভিল ইঞ্জিনিয়ারিং'];
+
     const newSession: StudySession = {
       id: `study-${Date.now()}`,
+      userId: userId || auth.currentUser?.uid,
       date: sessionDate,
       startTime,
       endTime,
       durationMinutes: duration,
-      subject,
+      subject: finalSubjects.join(', '),
+      subjects: finalSubjects,
       topic: topic.trim(),
       notes: notes.trim() || undefined,
       createdAt: Date.now(),
     };
 
     saveStudySession(newSession);
+    const activeUid = userId || auth.currentUser?.uid;
+    if (activeUid) {
+      saveStudySessionToCloud(activeUid, newSession);
+    }
     loadSessions();
 
     // Reset topic & notes
@@ -139,12 +216,72 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
     setSelectedDate(sessionDate);
   };
 
+  const handleOpenEdit = (session: StudySession) => {
+    setEditingSession(session);
+    setEditDate(session.date);
+    setEditStartTime(session.startTime);
+    setEditEndTime(session.endTime);
+    const subs = extractSessionSubjects(session);
+    setEditSubjects(subs.length > 0 ? subs : ['সিভিল ইঞ্জিনিয়ারিং']);
+    setEditTopic(session.topic);
+    setEditNotes(session.notes || '');
+    setEditCustomSubject('');
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSession) return;
+    if (!editTopic.trim()) {
+      alert(language === 'bn' ? 'অনুগ্রহ করে কী পড়েছেন তা লিখুন (টপিক / অধ্যায়)।' : 'Please enter what you studied.');
+      return;
+    }
+    if (editSubjects.length === 0) {
+      alert(language === 'bn' ? 'কমপক্ষে একটি বিষয় নির্বাচন করুন।' : 'Please select at least one subject.');
+      return;
+    }
+
+    const duration = calculateStudyDurationMinutes(editStartTime, editEndTime);
+    if (duration <= 0) {
+      alert(language === 'bn' ? 'শুরুর সময় এবং শেষের সময় সঠিক নয়।' : 'Invalid start or end time.');
+      return;
+    }
+
+    const updatedSession: StudySession = {
+      ...editingSession,
+      date: editDate,
+      startTime: editStartTime,
+      endTime: editEndTime,
+      durationMinutes: duration,
+      subject: editSubjects.join(', '),
+      subjects: editSubjects,
+      topic: editTopic.trim(),
+      notes: editNotes.trim() || undefined,
+      updatedAt: Date.now(),
+    };
+
+    updateStudySession(updatedSession);
+    const activeUid = userId || auth.currentUser?.uid;
+    if (activeUid) {
+      saveStudySessionToCloud(activeUid, updatedSession);
+    }
+    loadSessions();
+    setIsEditModalOpen(false);
+    setEditingSession(null);
+    setActionNotice(language === 'bn' ? 'পড়ার হিস্ট্রি সফলভাবে আপডেট করা হয়েছে!' : 'Study history updated successfully!');
+    setTimeout(() => setActionNotice(''), 3000);
+  };
+
   const handleDelete = (id: string) => {
     const confirmMsg = language === 'bn'
       ? 'আপনি কি এই পড়ার সেশনটি মুছে ফেলতে চান?'
       : 'Are you sure you want to delete this study session?';
     if (window.confirm(confirmMsg)) {
       deleteStudySession(id);
+      const activeUid = userId || auth.currentUser?.uid;
+      if (activeUid) {
+        deleteStudySessionFromCloud(activeUid, id);
+      }
       loadSessions();
     }
   };
@@ -200,25 +337,33 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
 
     const durationMins = Math.round(timerSeconds / 60);
     const todayStr = now.toISOString().slice(0, 10);
+    const finalSubjects = timerSubjects.length > 0 ? timerSubjects : ['সিভিল ইঞ্জিনিয়ারিং'];
 
     const newSession: StudySession = {
       id: `study-${Date.now()}`,
+      userId: userId || auth.currentUser?.uid,
       date: todayStr,
       startTime: timerStartTimeStr || endTimeStr,
       endTime: endTimeStr,
       durationMinutes: durationMins,
-      subject: timerSubject,
+      subject: finalSubjects.join(', '),
+      subjects: finalSubjects,
       topic: timerTopic.trim() || (language === 'bn' ? 'লাইভ টাইমার সেশন' : 'Live Timer Session'),
       createdAt: Date.now(),
     };
 
     saveStudySession(newSession);
+    const activeUid = userId || auth.currentUser?.uid;
+    if (activeUid) {
+      saveStudySessionToCloud(activeUid, newSession);
+    }
     loadSessions();
     handleResetTimer();
     setTimerTopic('');
     setSelectedDate(todayStr);
     setActiveTab('daily');
-    alert(language === 'bn' ? 'পড়ার সময় সফলভাবে সংরক্ষণ করা হয়েছে!' : 'Study session saved successfully!');
+    setActionNotice(language === 'bn' ? 'পড়ার সময় সফলভাবে সংরক্ষণ করা হয়েছে!' : 'Study session saved successfully!');
+    setTimeout(() => setActionNotice(''), 3000);
   };
 
   // Calculations for Selected Date
@@ -611,42 +756,122 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
               </button>
             </div>
 
-            {/* Row 2: Subject & What Was Studied (Topic) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-emerald-950 mb-1">
-                  {language === 'bn' ? 'বিষয় নির্বাচন করুন' : 'Select Subject'} <span className="text-rose-500">*</span>
+            {/* Row 2: Multi-Subject Selector with Handwriting Practice */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <label className="block text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{language === 'bn' ? 'বিষয়সমূহ নির্বাচন করুন (একাধিক সিলেক্ট করা যাবে)' : 'Select Subjects (Multiple allowed)'}</span>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    {selectedSubjects.length} {language === 'bn' ? 'টি বিষয় নির্বাচিত' : 'selected'}
+                  </span>
                 </label>
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden bg-white"
-                >
-                  {PRESET_SUBJECTS.map((sub) => (
-                    <option key={sub.id} value={sub.nameBn}>
-                      {language === 'bn' ? sub.nameBn : sub.nameEn}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSubjects(PRESET_SUBJECTS.map((p) => p.nameBn))}
+                    className="text-[11px] text-emerald-700 hover:text-emerald-900 font-semibold underline"
+                  >
+                    {language === 'bn' ? 'সবগুলো সিলেক্ট' : 'Select All'}
+                  </button>
+                  <span className="text-emerald-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSubjects(['সিভিল ইঞ্জিনিয়ারিং'])}
+                    className="text-[11px] text-stone-500 hover:text-stone-800 font-semibold underline"
+                  >
+                    {language === 'bn' ? 'রিসেট' : 'Reset'}
+                  </button>
+                </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-emerald-950 mb-1">
-                  {language === 'bn' ? 'কী পড়লেন? (অধ্যায় / টপিক)' : 'What did you study? (Topic/Chapter)'} <span className="text-rose-500">*</span>
-                </label>
+              {/* Preset Chips */}
+              <div className="flex flex-wrap gap-1.5 p-2.5 bg-emerald-50/40 rounded-xl border border-emerald-200/90">
+                {PRESET_SUBJECTS.map((sub) => {
+                  const isSelected = selectedSubjects.includes(sub.nameBn);
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => toggleFormSubject(sub.nameBn)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                        isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs scale-[1.02]'
+                          : 'bg-white text-emerald-950 border-emerald-200 hover:bg-emerald-100/60'
+                      }`}
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] ${
+                        isSelected ? 'bg-white text-emerald-700 font-black' : 'border border-emerald-300'
+                      }`}>
+                        {isSelected ? '✓' : ''}
+                      </span>
+                      <span>{language === 'bn' ? sub.nameBn : sub.nameEn}</span>
+                    </button>
+                  );
+                })}
+
+                {/* Any custom subjects added by user */}
+                {selectedSubjects
+                  .filter((s) => !PRESET_SUBJECTS.some((p) => p.nameBn === s))
+                  .map((customSub, idx) => (
+                    <button
+                      key={`custom-${idx}`}
+                      type="button"
+                      onClick={() => toggleFormSubject(customSub)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border bg-emerald-700 text-white border-emerald-800 shadow-xs"
+                    >
+                      <span>✓ {customSub}</span>
+                      <X className="w-3 h-3 text-emerald-200 hover:text-white" />
+                    </button>
+                  ))}
+              </div>
+
+              {/* Optional Custom Subject Adder */}
+              <div className="flex items-center gap-2 pt-0.5">
                 <input
                   type="text"
-                  required
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
+                  value={customSubjectInput}
+                  onChange={(e) => setCustomSubjectInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCustomFormSubject();
+                    }
+                  }}
                   placeholder={
                     language === 'bn'
-                      ? 'যেমন: সার্ভেয়িং অধ্যায় ৩ লেভেলিং সমস্যা বা ক্যালকুলাস ইন্টিগ্রেশন'
-                      : 'e.g. Surveying Leveling problems or Calculus integration'
+                      ? 'অন্য কোনো বিষয় যোগ করতে এখানে লিখুন...'
+                      : 'Type custom subject name and click Add...'
                   }
-                  className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden bg-white"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-emerald-200 text-xs text-emerald-950 focus:ring-2 focus:ring-emerald-500 bg-white"
                 />
+                <button
+                  type="button"
+                  onClick={handleAddCustomFormSubject}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold transition-colors"
+                >
+                  {language === 'bn' ? '+ বিষয় যোগ' : '+ Add Subject'}
+                </button>
               </div>
+            </div>
+
+            {/* Row 3: What Was Studied (Topic) */}
+            <div>
+              <label className="block text-xs font-bold text-emerald-950 mb-1">
+                {language === 'bn' ? 'কী পড়লেন? (অধ্যায় / টপিক)' : 'What did you study? (Topic/Chapter)'} <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder={
+                  language === 'bn'
+                    ? 'যেমন: সার্ভেয়িং অধ্যায় ৩ লেভেলিং সমস্যা বা ক্যালকুলাস ইন্টিগ্রেশন'
+                    : 'e.g. Surveying Leveling problems or Calculus integration'
+                }
+                className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden bg-white"
+              />
             </div>
 
             {/* Optional Notes */}
@@ -694,28 +919,44 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
               {String(timerSeconds % 60).padStart(2, '0')}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left pt-2">
+            <div className="space-y-2 text-left pt-2">
               <div>
-                <label className="block text-[11px] font-bold text-emerald-950 mb-1">বিষয়:</label>
-                <select
-                  value={timerSubject}
-                  onChange={(e) => setTimerSubject(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-emerald-200 text-xs text-emerald-950 bg-white"
-                >
-                  {PRESET_SUBJECTS.map((sub) => (
-                    <option key={sub.id} value={sub.nameBn}>
-                      {sub.nameBn}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                  {language === 'bn' ? 'বিষয়সমূহ নির্বাচন (একাধিক সিলেক্ট করা যাবে):' : 'Select Subjects (Multiple allowed):'}
+                  <span className="text-[10px] text-emerald-700 font-semibold ml-1.5">
+                    ({timerSubjects.length} {language === 'bn' ? 'টি নির্বাচিত' : 'selected'})
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-1 p-2 bg-emerald-50/50 rounded-xl border border-emerald-200">
+                  {PRESET_SUBJECTS.map((sub) => {
+                    const isSelected = timerSubjects.includes(sub.nameBn);
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => toggleTimerSubject(sub.nameBn)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 border ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs font-bold'
+                            : 'bg-white text-emerald-950 border-emerald-200 hover:bg-emerald-100/50'
+                        }`}
+                      >
+                        <span>{isSelected ? '✓ ' : ''}{sub.nameBn}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
               <div>
-                <label className="block text-[11px] font-bold text-emerald-950 mb-1">টপিক:</label>
+                <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                  {language === 'bn' ? 'টপিক বা কী পড়ছেন:' : 'Topic or what you are studying:'}
+                </label>
                 <input
                   type="text"
                   value={timerTopic}
                   onChange={(e) => setTimerTopic(e.target.value)}
-                  placeholder="কী পড়ছেন?"
+                  placeholder={language === 'bn' ? 'কী পড়ছেন? (যেমন: সার্ভেয়িং ম্যাথ বা হাতের লেখা)' : 'What are you studying?'}
                   className="w-full px-2.5 py-1.5 rounded-lg border border-emerald-200 text-xs text-emerald-950 bg-white"
                 />
               </div>
@@ -891,18 +1132,27 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
                   key={item.id ? `${item.id}-${idx}` : `sess-${idx}`}
                   className="p-3.5 sm:p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors flex items-start justify-between gap-3"
                 >
-                  <div className="space-y-1.5">
-                    {/* Time badge & Subject */}
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    {/* Time badge & Subject Badges */}
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-xs font-mono font-bold bg-white border border-emerald-200 text-emerald-950 px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
                         <Clock className="w-3 h-3 text-emerald-600" />
                         <span>{item.startTime} - {item.endTime}</span>
                         <span className="text-emerald-700/60 font-sans">({formatDuration(item.durationMinutes, language)})</span>
                       </span>
 
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900">
-                        {item.subject}
-                      </span>
+                      {extractSessionSubjects(item).map((subName, sIdx) => {
+                        const preset = PRESET_SUBJECTS.find((p) => p.nameBn === subName || p.nameEn === subName);
+                        const colorClass = preset?.color || 'bg-emerald-100 text-emerald-900 border-emerald-300';
+                        return (
+                          <span
+                            key={sIdx}
+                            className={`text-xs font-bold px-2 py-0.5 rounded-md border ${colorClass} shadow-2xs`}
+                          >
+                            {subName}
+                          </span>
+                        );
+                      })}
                     </div>
 
                     {/* What was studied */}
@@ -919,15 +1169,28 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
                     )}
                   </div>
 
-                  {/* Delete button */}
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0"
-                    title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
-                    aria-label="Delete session"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {/* Actions: Edit & Delete buttons */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(item)}
+                      className="px-2 py-1 text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100/60 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold border border-emerald-200/80 bg-white shadow-2xs"
+                      title={language === 'bn' ? 'পড়ার হিস্ট্রি এডিট করুন' : 'Edit study session'}
+                      aria-label="Edit session"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{language === 'bn' ? 'এডিট' : 'Edit'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item.id)}
+                      className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+                      aria-label="Delete session"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1021,21 +1284,30 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
                     </span>
                   </div>
 
-                  {/* Day Sessions List */}
+                    {/* Day Sessions List */}
                   <div className="divide-y divide-emerald-50 p-2 sm:p-3 space-y-2">
                     {daySessions.map((session, sIdx) => (
                       <div
                         key={session.id ? `${session.id}-${sIdx}` : `day-sess-${sIdx}`}
                         className="p-3 rounded-xl hover:bg-emerald-50/30 transition-colors flex items-start justify-between gap-2"
                       >
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-xs font-mono font-semibold text-emerald-900 bg-emerald-100/70 px-2 py-0.5 rounded-md">
                               {session.startTime} - {session.endTime} ({formatDuration(session.durationMinutes, language)})
                             </span>
-                            <span className="text-xs font-bold text-emerald-800">
-                              {session.subject}
-                            </span>
+                            {extractSessionSubjects(session).map((subName, subIdx) => {
+                              const preset = PRESET_SUBJECTS.find((p) => p.nameBn === subName || p.nameEn === subName);
+                              const colorClass = preset?.color || 'bg-emerald-100 text-emerald-900 border-emerald-300';
+                              return (
+                                <span
+                                  key={subIdx}
+                                  className={`text-xs font-bold px-2 py-0.5 rounded-md border ${colorClass} shadow-2xs`}
+                                >
+                                  {subName}
+                                </span>
+                              );
+                            })}
                           </div>
 
                           <p className="text-xs sm:text-sm font-bold text-emerald-950">
@@ -1049,13 +1321,28 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
                           )}
                         </div>
 
-                        <button
-                          onClick={() => handleDelete(session.id)}
-                          className="p-1.5 text-stone-400 hover:text-rose-600 rounded-lg transition-colors"
-                          title="মুছে ফেলুন"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {/* Actions: Edit & Delete buttons */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(session)}
+                            className="px-2 py-1 text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100/60 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold border border-emerald-200/80 bg-white shadow-2xs"
+                            title={language === 'bn' ? 'পড়ার হিস্ট্রি এডিট করুন' : 'Edit study session'}
+                            aria-label="Edit session"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{language === 'bn' ? 'এডিট' : 'Edit'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(session.id)}
+                            className="p-1.5 text-stone-400 hover:text-rose-600 rounded-lg transition-colors"
+                            title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+                            aria-label="Delete session"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1063,6 +1350,231 @@ export const StudyTimeScreen: React.FC<StudyTimeScreenProps> = ({
               );
             })
           )}
+        </div>
+      )}
+
+      {/* 7. EDIT STUDY SESSION MODAL */}
+      {isEditModalOpen && editingSession && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-emerald-200 overflow-hidden my-auto animate-in zoom-in-95">
+            {/* Header */}
+            <div className="p-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-2xs">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-950">
+                    {language === 'bn' ? 'পড়ার হিস্ট্রি এডিট করুন' : 'Edit Study Session'}
+                  </h3>
+                  <p className="text-[11px] text-emerald-700/80">
+                    {formatDateDisplay(editDate)} • {editStartTime} - {editEndTime}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingSession(null);
+                }}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveEdit} className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Date, Start Time, End Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{language === 'bn' ? 'তারিখ' : 'Date'}</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 mb-1 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{language === 'bn' ? 'শুরুর সময়' : 'Start'}</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editStartTime}
+                    onChange={(e) => setEditStartTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 mb-1 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{language === 'bn' ? 'শেষের সময়' : 'End'}</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editEndTime}
+                    onChange={(e) => setEditEndTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Duration Preview */}
+              <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs">
+                <span className="font-semibold text-emerald-900">
+                  {language === 'bn' ? 'সংশোধিত মোট পড়ার সময়:' : 'Calculated Duration:'}
+                </span>
+                <span className="font-bold text-emerald-950 font-mono">
+                  {formatDuration(calculateStudyDurationMinutes(editStartTime, editEndTime), language)}
+                </span>
+              </div>
+
+              {/* Multi-Subject selection with Handwriting Practice */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-emerald-950 flex items-center justify-between">
+                  <span>{language === 'bn' ? 'বিষয়সমূহ নির্বাচন (একাধিক হতে পারে):' : 'Subjects (Multiple allowed):'}</span>
+                  <span className="text-[11px] text-emerald-700 font-semibold">
+                    ({editSubjects.length} {language === 'bn' ? 'টি নির্বাচিত' : 'selected'})
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 p-2.5 bg-emerald-50/40 rounded-xl border border-emerald-200">
+                  {PRESET_SUBJECTS.map((sub) => {
+                    const isSelected = editSubjects.includes(sub.nameBn);
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => toggleEditSubject(sub.nameBn)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                            : 'bg-white text-emerald-950 border-emerald-200 hover:bg-emerald-100/60'
+                        }`}
+                      >
+                        <span>{isSelected ? '✓ ' : ''}{language === 'bn' ? sub.nameBn : sub.nameEn}</span>
+                      </button>
+                    );
+                  })}
+
+                  {editSubjects
+                    .filter((s) => !PRESET_SUBJECTS.some((p) => p.nameBn === s))
+                    .map((customSub, idx) => (
+                      <button
+                        key={`custom-edit-${idx}`}
+                        type="button"
+                        onClick={() => toggleEditSubject(customSub)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold border bg-emerald-700 text-white border-emerald-800 shadow-2xs flex items-center gap-1"
+                      >
+                        <span>✓ {customSub}</span>
+                        <X className="w-3 h-3" />
+                      </button>
+                    ))}
+                </div>
+
+                {/* Add custom subject in edit mode */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={editCustomSubject}
+                    onChange={(e) => setEditCustomSubject(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomEditSubject();
+                      }
+                    }}
+                    placeholder={language === 'bn' ? 'অন্য কোনো বিষয় যোগ করতে লিখুন...' : 'Add other subject...'}
+                    className="flex-1 px-2.5 py-1.5 rounded-lg border border-emerald-200 text-xs text-emerald-950 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomEditSubject}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold transition-colors"
+                  >
+                    {language === 'bn' ? '+ যোগ' : '+ Add'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Topic / What was studied */}
+              <div>
+                <label className="block text-xs font-bold text-emerald-950 mb-1">
+                  {language === 'bn' ? 'কী পড়লেন? (টপিক / অধ্যায়)' : 'Topic / What did you study?'} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editTopic}
+                  onChange={(e) => setEditTopic(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 bg-white"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-bold text-emerald-950 mb-1">
+                  {language === 'bn' ? 'মন্তব্য বা নোট (ঐচ্ছিক)' : 'Notes (Optional)'}
+                </label>
+                <input
+                  type="text"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs sm:text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 bg-white"
+                />
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-between pt-3 border-t border-emerald-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editingSession) {
+                      handleDelete(editingSession.id);
+                      setIsEditModalOpen(false);
+                      setEditingSession(null);
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setEditingSession(null);
+                    }}
+                    className="px-4 py-2 rounded-xl border border-stone-200 text-stone-700 hover:bg-stone-50 text-xs font-bold transition-colors"
+                  >
+                    {language === 'bn' ? 'বাতিল' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>{language === 'bn' ? 'পরিবর্তন সংরক্ষণ করুন' : 'Save Changes'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

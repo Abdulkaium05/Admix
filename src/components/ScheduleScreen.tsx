@@ -30,7 +30,7 @@ import {
   Check,
 } from 'lucide-react';
 
-const STANDARD_SUBJECTS = ['সিভিল ইঞ্জিনিয়ারিং', 'গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'ইংরেজি'];
+const STANDARD_SUBJECTS = ['সিভিল ইঞ্জিনিয়ারিং', 'গণিত', 'পদার্থবিজ্ঞান', 'রসায়ন', 'ইংরেজি', 'হ্যান্ডরাইটিং প্র্যাকটিস'];
 
 interface ScheduleScreenProps {
   language: Language;

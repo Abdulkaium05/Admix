@@ -41,6 +41,7 @@ const PRESET_SUBJECTS = [
   'পদার্থবিজ্ঞান (Physics)',
   'রসায়ন (Chemistry)',
   'ইংরেজি (English)',
+  'হ্যান্ডরাইটিং প্র্যাকটিস (Handwriting Practice)',
   'অন্যান্য / সাধারণ প্রস্তুতি',
 ];
 
@@ -62,10 +63,20 @@ export const StudyGraphScreen: React.FC<StudyGraphScreenProps> = ({
   const [sessionDate, setSessionDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState<string>('07:00');
   const [endTime, setEndTime] = useState<string>('10:00');
-  const [subject, setSubject] = useState<string>('সিভিল ইঞ্জিনিয়ারিং');
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['সিভিল ইঞ্জিনিয়ারিং']);
   const [topic, setTopic] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [successToast, setSuccessToast] = useState<string>('');
+
+  const toggleSubject = (sub: string) => {
+    setSelectedSubjects((prev) => {
+      if (prev.includes(sub)) {
+        if (prev.length <= 1) return prev; // keep at least 1
+        return prev.filter((s) => s !== sub);
+      }
+      return [...prev, sub];
+    });
+  };
 
   // Keep sessions in sync if prop changes
   useEffect(() => {
@@ -100,7 +111,8 @@ export const StudyGraphScreen: React.FC<StudyGraphScreenProps> = ({
       startTime,
       endTime,
       durationMinutes: duration,
-      subject,
+      subject: selectedSubjects.join(', '),
+      subjects: selectedSubjects,
       topic: topic.trim(),
       notes: notes.trim() || undefined,
       createdAt: Date.now(),
@@ -468,19 +480,30 @@ export const StudyGraphScreen: React.FC<StudyGraphScreenProps> = ({
 
               <div>
                 <label className="text-xs font-semibold text-emerald-900 block mb-1">
-                  {language === 'bn' ? 'বিষয়' : 'Subject'}
+                  {language === 'bn' ? 'বিষয় নির্বাচন (একাধিক নির্বাচন করা যাবে)' : 'Select Subjects (Multiple allowed)'}
+                  <span className="text-[11px] text-emerald-700 font-normal ml-1.5">
+                    ({selectedSubjects.length} {language === 'bn' ? 'টি নির্বাচিত' : 'selected'})
+                  </span>
                 </label>
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs text-emerald-950 font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                >
-                  {PRESET_SUBJECTS.map((sub) => (
-                    <option key={sub} value={sub}>
-                      {sub}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap gap-1.5 p-2 bg-emerald-50/50 rounded-xl border border-emerald-200">
+                  {PRESET_SUBJECTS.map((sub) => {
+                    const isSelected = selectedSubjects.includes(sub);
+                    return (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => toggleSubject(sub)}
+                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs font-bold'
+                            : 'bg-white text-stone-700 border-stone-200 hover:bg-emerald-50'
+                        }`}
+                      >
+                        {isSelected ? '✓ ' : ''}{sub}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>

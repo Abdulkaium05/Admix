@@ -297,12 +297,58 @@ export function getStudySessions(): StudySession[] {
 export function saveStudySession(session: StudySession): void {
   try {
     const list = getStudySessions().filter((s) => s.id !== session.id);
-    // Prepend new session
+    // Prepend new or updated session
     list.unshift(session);
+    // Re-sort descending by date then createdAt
+    list.sort((a, b) => {
+      if (b.date !== a.date) {
+        return b.date.localeCompare(a.date);
+      }
+      return b.createdAt - a.createdAt;
+    });
     localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(list));
   } catch (e) {
     console.error('Failed to save study session', e);
   }
+}
+
+export function updateStudySession(session: StudySession): void {
+  try {
+    const list = getStudySessions();
+    const index = list.findIndex((s) => s.id === session.id);
+    const updated: StudySession = {
+      ...session,
+      updatedAt: Date.now(),
+    };
+    if (index >= 0) {
+      list[index] = updated;
+    } else {
+      list.unshift(updated);
+    }
+    // Re-sort descending by date then createdAt
+    list.sort((a, b) => {
+      if (b.date !== a.date) {
+        return b.date.localeCompare(a.date);
+      }
+      return b.createdAt - a.createdAt;
+    });
+    localStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error('Failed to update study session', e);
+  }
+}
+
+/**
+ * Extracts list of subjects from a session, handling both array subjects and comma-separated string
+ */
+export function extractSessionSubjects(session: { subject?: string; subjects?: string[] }): string[] {
+  if (session.subjects && Array.isArray(session.subjects) && session.subjects.length > 0) {
+    return session.subjects.filter(Boolean);
+  }
+  if (session.subject && session.subject.includes(',')) {
+    return session.subject.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  return session.subject ? [session.subject.trim()] : ['সিভিল ইঞ্জিনিয়ারিং'];
 }
 
 export function deleteStudySession(sessionId: string): void {

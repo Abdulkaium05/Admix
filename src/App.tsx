@@ -478,6 +478,7 @@ export default function App() {
         {currentView === 'study_time' && (
           <StudyTimeScreen
             language={language}
+            userId={firebaseUser?.uid}
             onNavigateHome={() => setCurrentView('home')}
             onNavigateGraph={() => setCurrentView('study_graph')}
             onNavigateTasks={() => setCurrentView('study_tasks')}

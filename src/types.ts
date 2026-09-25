@@ -79,14 +79,17 @@ export interface DailyLimitInfo {
 
 export interface StudySession {
   id: string;
+  userId?: string;
   date: string; // YYYY-MM-DD
   startTime: string; // "06:00" or "06:00 AM"
   endTime: string; // "09:00" or "09:00 AM"
   durationMinutes: number; // duration in minutes (e.g. 180 = 3h)
-  subject: string; // e.g. "Civil Engineering", "Math", "Physics", etc.
+  subject: string; // e.g. "Civil Engineering", "Math", "Physics", etc. or comma-separated list
+  subjects?: string[]; // Multiple selected subjects
   topic: string; // what was studied, e.g. "Surveying Chapter 3"
   notes?: string;
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface StudyTask {

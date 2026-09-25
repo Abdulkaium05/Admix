@@ -48,6 +48,7 @@ const PRESET_SUBJECTS = [
   { full: 'পদার্থবিজ্ঞান (Physics)', short: 'পদার্থ' },
   { full: 'রসায়ন (Chemistry)', short: 'রসায়ন' },
   { full: 'ইংরেজি (English)', short: 'ইংরেজি' },
+  { full: 'হ্যান্ডরাইটিং প্র্যাকটিস (Handwriting Practice)', short: 'হ্যান্ডরাইটিং' },
   { full: 'অন্যান্য / সাধারণ প্রস্তুতি', short: 'সাধারণ' },
 ];
 

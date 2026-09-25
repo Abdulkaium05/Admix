@@ -72,9 +72,11 @@
         "endTime": { "type": "string", "description": "Session end time" },
         "durationMinutes": { "type": "number", "description": "Total duration in minutes" },
         "subject": { "type": "string", "description": "Subject studied" },
+        "subjects": { "type": "array", "items": { "type": "string" }, "description": "Multiple selected subjects" },
         "topic": { "type": "string", "description": "Specific topic or chapter studied" },
         "notes": { "type": "string", "description": "Optional notes or remarks" },
-        "createdAt": { "type": "number", "description": "Creation timestamp" }
+        "createdAt": { "type": "number", "description": "Creation timestamp" },
+        "updatedAt": { "type": "number", "description": "Update timestamp" }
       },
       "required": ["id", "userId", "date", "startTime", "endTime", "durationMinutes", "subject", "topic"]
     },

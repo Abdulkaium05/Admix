@@ -157,7 +157,19 @@ export const StudyTimeChart: React.FC<StudyTimeChartProps> = ({
       const daySessions = sessionMap.get(dateStr) || [];
       const totalMinutes = daySessions.reduce((sum, s) => sum + s.durationMinutes, 0);
       const topics = daySessions.map((s) => s.topic).filter(Boolean);
-      const subjects = Array.from(new Set(daySessions.map((s) => s.subject).filter(Boolean)));
+      const subjects = Array.from(
+        new Set(
+          daySessions.flatMap((s) => {
+            if (s.subjects && Array.isArray(s.subjects) && s.subjects.length > 0) {
+              return s.subjects;
+            }
+            if (s.subject && s.subject.includes(',')) {
+              return s.subject.split(',').map((x) => x.trim()).filter(Boolean);
+            }
+            return s.subject ? [s.subject] : [];
+          })
+        )
+      );
 
       const dayNumber = d.getDate();
       const shortDay = language === 'bn' ? dayNumber.toLocaleString('bn-BD') : String(dayNumber);
