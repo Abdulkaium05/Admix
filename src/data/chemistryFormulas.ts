@@ -20,6 +20,23 @@ export interface ChemistryQuizQuestion {
   explanation: string;
 }
 
+export type RecallDirection = 'name_to_formula' | 'formula_to_name' | 'mixed';
+
+export interface ChemistryRecallQuestion {
+  id: string;
+  compoundId: string;
+  direction: 'name_to_formula' | 'formula_to_name';
+  questionTitle: string;
+  questionSubtitle: string;
+  questionPrompt: string;
+  commonName: string;
+  chemicalName: string;
+  formula: string;
+  duetRef?: string;
+  category?: string;
+  explanation: string;
+}
+
 // Complete verified dataset based on DUET Admission Care sheet and user provided reference
 export const chemistryFormulas: ChemistryCompound[] = [
   {
@@ -531,3 +548,63 @@ export function generateChemistryQuiz(count: number = 10): ChemistryQuizQuestion
     };
   });
 }
+
+/**
+ * Generates Self-Recall questions without MCQ options.
+ * Direction 1 ('name_to_formula'): Prompts commercial name, user mentally thinks formula, then reveals.
+ * Direction 2 ('formula_to_name'): Prompts chemical formula, user mentally thinks chemical name, then reveals.
+ * Direction 3 ('mixed'): Combines both directions.
+ */
+export function generateRecallQuestions(
+  count: number = 15,
+  direction: RecallDirection = 'name_to_formula'
+): ChemistryRecallQuestion[] {
+  const maxPossible = chemistryFormulas.length;
+  const validCount = Math.max(5, Math.min(maxPossible, count));
+  const shuffledCompounds = shuffleArray(chemistryFormulas);
+  const selectedCompounds = shuffledCompounds.slice(0, validCount);
+
+  return selectedCompounds.map((compound, index) => {
+    let chosenDirection: 'name_to_formula' | 'formula_to_name';
+    if (direction === 'mixed') {
+      chosenDirection = index % 2 === 0 ? 'name_to_formula' : 'formula_to_name';
+    } else {
+      chosenDirection = direction;
+    }
+
+    const duetSuffix = compound.duetRef ? ` [${compound.duetRef}]` : '';
+
+    if (chosenDirection === 'name_to_formula') {
+      return {
+        id: `recall_n2f_${compound.id}_${index}`,
+        compoundId: compound.id,
+        direction: 'name_to_formula',
+        questionTitle: compound.commonName,
+        questionSubtitle: 'বাণিজ্যিক / প্রচলিত নাম',
+        questionPrompt: `‘${compound.commonName}’ এর সঠিক রাসায়নিক সংকেত কোনটি?`,
+        commonName: compound.commonName,
+        chemicalName: compound.chemicalName,
+        formula: compound.formula,
+        duetRef: compound.duetRef,
+        category: compound.category,
+        explanation: `‘${compound.commonName}’ এর রাসায়নিক নাম হলো ‘${compound.chemicalName}’ এবং সংকেত হলো ‘${compound.formula}’${duetSuffix}।`,
+      };
+    } else {
+      return {
+        id: `recall_f2n_${compound.id}_${index}`,
+        compoundId: compound.id,
+        direction: 'formula_to_name',
+        questionTitle: compound.formula,
+        questionSubtitle: 'রাসায়নিক সংকেত',
+        questionPrompt: `এই সংকেতটির (${compound.formula}) রাসায়নিক নাম ও সাধারণ নাম কী?`,
+        commonName: compound.commonName,
+        chemicalName: compound.chemicalName,
+        formula: compound.formula,
+        duetRef: compound.duetRef,
+        category: compound.category,
+        explanation: `সংকেত ${compound.formula} এর রাসায়নিক নাম ‘${compound.chemicalName}’ এবং বাণিজ্যিক নাম ‘${compound.commonName}’${duetSuffix}।`,
+      };
+    }
+  });
+}
+

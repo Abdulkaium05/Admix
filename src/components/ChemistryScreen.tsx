@@ -21,11 +21,19 @@ import {
   Atom,
   ArrowRight,
   Compass,
+  Eye,
+  EyeOff,
+  Brain,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import {
   chemistryFormulas,
   generateChemistryQuiz,
+  generateRecallQuestions,
   ChemistryQuizQuestion,
+  ChemistryRecallQuestion,
+  RecallDirection,
   ChemistryCompound,
 } from '../data/chemistryFormulas';
 import { ElementValencyQuiz } from './ElementValencyQuiz';
@@ -38,18 +46,18 @@ interface ChemistryScreenProps {
 
 type ChemistryView = 'hub' | 'elements' | 'quiz' | 'formulas';
 type QuizPhase = 'setup' | 'active' | 'result';
-type QuizMode = 'practice' | 'exam';
+type QuizMode = 'practice' | 'exam' | 'recall';
 
 export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBack }) => {
   // Navigation: Default to 'hub' landing screen showing two big cards
   const [currentView, setCurrentView] = useState<ChemistryView>('hub');
 
   // Quiz Settings State
-  const [questionCount, setQuestionCount] = useState<number>(15); // Default 15 (between 10-30)
+  const [questionCount, setQuestionCount] = useState<number>(15); // Default 15 (between 10-30 or all 64)
   const [quizMode, setQuizMode] = useState<QuizMode>('exam');
   const [quizPhase, setQuizPhase] = useState<QuizPhase>('setup');
 
-  // Active Quiz State
+  // Active Quiz State (MCQ)
   const [questions, setQuestions] = useState<ChemistryQuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({}); // questionIndex -> selectedOptionIndex
@@ -57,22 +65,37 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
   const [timeLeft, setTimeLeft] = useState<number>(0); // Seconds for exam mode
   const [examDuration, setExamDuration] = useState<number>(0);
 
+  // Recall / Reveal Answer Mode State (No Options, Mental Self-Recall)
+  const [recallDirection, setRecallDirection] = useState<RecallDirection>('name_to_formula');
+  const [recallQuestions, setRecallQuestions] = useState<ChemistryRecallQuestion[]>([]);
+  const [recallRevealed, setRecallRevealed] = useState<Record<number, boolean>>({});
+  const [recallFeedback, setRecallFeedback] = useState<Record<number, 'correct' | 'wrong'>>({});
+
   // Formula Sheet Search & Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('সবগুলো');
 
   // Start Quiz Handler
   const handleStartQuiz = () => {
-    const generated = generateChemistryQuiz(questionCount);
-    setQuestions(generated);
-    setCurrentIndex(0);
-    setUserAnswers({});
-    setRevealedInPractice({});
-    // 45 seconds per question in exam mode
-    const totalSecs = generated.length * 45;
-    setTimeLeft(totalSecs);
-    setExamDuration(totalSecs);
-    setQuizPhase('active');
+    if (quizMode === 'recall') {
+      const generated = generateRecallQuestions(questionCount, recallDirection);
+      setRecallQuestions(generated);
+      setCurrentIndex(0);
+      setRecallRevealed({});
+      setRecallFeedback({});
+      setQuizPhase('active');
+    } else {
+      const generated = generateChemistryQuiz(questionCount);
+      setQuestions(generated);
+      setCurrentIndex(0);
+      setUserAnswers({});
+      setRevealedInPractice({});
+      // 45 seconds per question in exam mode
+      const totalSecs = generated.length * 45;
+      setTimeLeft(totalSecs);
+      setExamDuration(totalSecs);
+      setQuizPhase('active');
+    }
   };
 
   // Timer Effect for Exam Mode
@@ -155,6 +178,27 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
     return { score: correct, correct, wrong, skipped, percentage };
   }, [questions, userAnswers]);
 
+  // Recall Mode Stats Calculation
+  const recallStats = useMemo(() => {
+    if (recallQuestions.length === 0) {
+      return { total: 0, remembered: 0, forgot: 0, unrated: 0, percentage: 0 };
+    }
+    let remembered = 0;
+    let forgot = 0;
+    let unrated = 0;
+
+    recallQuestions.forEach((_, idx) => {
+      const fb = recallFeedback[idx];
+      if (fb === 'correct') remembered++;
+      else if (fb === 'wrong') forgot++;
+      else unrated++;
+    });
+
+    const rated = remembered + forgot;
+    const percentage = rated > 0 ? Math.round((remembered / rated) * 100) : 0;
+    return { total: recallQuestions.length, remembered, forgot, unrated, percentage };
+  }, [recallQuestions, recallFeedback]);
+
   // Filtered Formulas for Formula Guide
   const filteredFormulas = useMemo(() => {
     return chemistryFormulas.filter((item) => {
@@ -184,6 +228,7 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
   };
 
   const currentQ = questions[currentIndex];
+  const currentRecallQ = recallQuestions[currentIndex];
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
@@ -219,7 +264,9 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                 : currentView === 'elements'
                 ? 'মৌলের গ্রুপ সংখ্যা ও পরিবর্তনশীল যোজনী কুইজ'
                 : currentView === 'quiz'
-                ? 'বাণিজ্যিক ও রাসায়নিক সংকেত কুইজ'
+                ? quizMode === 'recall'
+                  ? 'অপশনহীন রিভেল আনসার মেমোরি টেস্ট'
+                  : 'বাণিজ্যিক ও রাসায়নিক সংকেত কুইজ'
                 : 'সকল রাসায়নিক সংকেত ভাণ্ডার ও স্টাডি শিট'}
             </p>
           </div>
@@ -284,39 +331,61 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
               </div>
             </button>
 
-            {/* Card 2: রাসায়নিক সংকেত কুইজ */}
-            <button
-              type="button"
-              onClick={() => setCurrentView('quiz')}
-              className="w-full text-left p-5 sm:p-6 rounded-3xl bg-radial from-teal-500/10 via-white to-white border-2 border-emerald-200 hover:border-teal-500 shadow-xs hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer relative overflow-hidden active:scale-[0.99]"
-            >
+            {/* Card 2: রাসায়নিক সংকেত কুইজ ও রিভেল মোড */}
+            <div className="w-full text-left p-5 sm:p-6 rounded-3xl bg-radial from-teal-500/10 via-white to-white border-2 border-emerald-200 hover:border-teal-500 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden">
               <div className="space-y-3 relative z-10">
                 <div className="flex items-center justify-between">
-                  <div className="w-13 h-13 rounded-2xl bg-teal-100 text-teal-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <div className="w-13 h-13 rounded-2xl bg-teal-100 text-teal-800 flex items-center justify-center">
                     <FlaskConical className="w-7 h-7 text-teal-700" />
                   </div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-100 text-teal-800 border border-teal-200">
-                    ১০-৩০ টি প্রশ্ন
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      MCQ ও রিভেল
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">
+                      ৬৪টি সংকেত
+                    </span>
+                  </div>
                 </div>
 
                 <div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-emerald-950 group-hover:text-teal-700 transition-colors flex items-center gap-1.5">
-                    <span>রাসায়নিক সংকেত কুইজ</span>
+                  <h3 className="text-base sm:text-lg font-extrabold text-emerald-950 flex items-center gap-1.5">
+                    <span>রাসায়নিক সংকেত কুইজ ও সেলফ-টেস্ট</span>
                   </h3>
                   <p className="text-xs text-emerald-700/90 mt-1 leading-relaxed">
-                    ডুয়েট ভর্তি পরীক্ষায় বিগত বছরগুলোতে আসা বাণিজ্যিক ও রাসায়নিক নাম, সংকেত নিয়ে ১০ থেকে ৩০ টি প্রশ্নের পূর্ণাঙ্গ মডেল টেস্ট ও তাৎক্ষণিক উত্তর।
+                    বাণিজ্যিক ও রাসায়নিক নাম, সংকেতের পূর্ণাঙ্গ MCQ মডেল টেস্ট এবং কোনো অপশন ছাড়া মনে মনে উত্তর দিয়ে ‘রিভেল আনসার’ সেলফ-টেস্ট।
                   </p>
                 </div>
               </div>
 
-              <div className="pt-4 mt-4 border-t border-emerald-100/80 flex items-center justify-between text-xs font-bold text-teal-800 group-hover:text-emerald-950">
-                <span>কুইজ টেস্ট দিন</span>
-                <span className="w-7 h-7 rounded-xl bg-teal-100 group-hover:bg-teal-600 group-hover:text-white flex items-center justify-center transition-all">
-                  <ArrowRight className="w-4 h-4" />
-                </span>
+              <div className="pt-4 mt-4 border-t border-emerald-100/80 grid grid-cols-2 gap-2 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView('quiz');
+                    setQuizMode('exam');
+                    setQuizPhase('setup');
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-teal-50 hover:bg-teal-600 hover:text-white text-teal-900 border border-teal-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>MCQ কুইজ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView('quiz');
+                    setQuizMode('recall');
+                    setQuizPhase('setup');
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>রিভেল টেস্ট</span>
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-amber-300 text-amber-950 font-black">নতুন</span>
+                </button>
               </div>
-            </button>
+            </div>
           </div>
 
           {/* Quick link to সংকেত ভাণ্ডার study sheet */}
@@ -346,42 +415,59 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
 
       {/* Sub-Navigation Switcher (Visible only inside sub-screens for quick jumping) */}
       {currentView !== 'hub' && (
-        <div className="grid grid-cols-3 gap-1 p-1 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl">
+        <div className="grid grid-cols-4 gap-1 p-1 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl">
           <button
             onClick={() => setCurrentView('elements')}
-            className={`py-2 px-1 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
+            className={`py-2 px-1 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all cursor-pointer ${
               currentView === 'elements'
                 ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
                 : 'text-emerald-700 hover:text-emerald-950'
             }`}
           >
             <Atom className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            <span className="whitespace-nowrap">গ্রুপ ও যোজনী</span>
+            <span className="truncate">গ্রুপ ও যোজনী</span>
           </button>
           <button
             onClick={() => {
               setCurrentView('quiz');
+              setQuizMode('exam');
               setQuizPhase('setup');
             }}
-            className={`py-2 px-1 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
-              currentView === 'quiz'
+            className={`py-2 px-1 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all cursor-pointer ${
+              currentView === 'quiz' && quizMode !== 'recall'
                 ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
                 : 'text-emerald-700 hover:text-emerald-950'
             }`}
           >
             <Play className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            <span className="whitespace-nowrap">সংকেত কুইজ</span>
+            <span className="truncate">সংকেত MCQ</span>
+          </button>
+          <button
+            onClick={() => {
+              setCurrentView('quiz');
+              setQuizMode('recall');
+              setQuizPhase('setup');
+            }}
+            className={`py-2 px-1 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all cursor-pointer ${
+              currentView === 'quiz' && quizMode === 'recall'
+                ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
+                : 'text-emerald-700 hover:text-emerald-950'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="truncate">রিভেল মোড</span>
+            <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-100 text-amber-800 hidden sm:inline">নতুন</span>
           </button>
           <button
             onClick={() => setCurrentView('formulas')}
-            className={`py-2 px-1 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
+            className={`py-2 px-1 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all cursor-pointer ${
               currentView === 'formulas'
                 ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
                 : 'text-emerald-700 hover:text-emerald-950'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            <span className="whitespace-nowrap">সংকেত ভাণ্ডার</span>
+            <span className="truncate">সংকেত ভাণ্ডার</span>
           </button>
         </div>
       )}
@@ -414,63 +500,71 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                   </div>
                 </div>
 
-                {/* Question Count Selector (10 to 30) */}
+                {/* Question Count Selector */}
                 <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-1.5">
                       <SlidersHorizontal className="w-4 h-4 text-emerald-600" />
-                      <span>প্রশ্নের সংখ্যা নির্বাচন করুন (১০ - ৩০ টি):</span>
+                      <span>
+                        {quizMode === 'recall'
+                          ? 'অনুশীলনের জন্য সংকেত সংখ্যা নির্বাচন করুন:'
+                          : 'প্রশ্নের সংখ্যা নির্বাচন করুন (১০ - ৩০ টি):'}
+                      </span>
                     </label>
                     <span className="text-sm sm:text-base font-extrabold text-emerald-900 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg font-mono">
-                      {questionCount} টি
+                      {questionCount === chemistryFormulas.length ? 'সবগুলো (৬৪টি)' : `${questionCount} টি`}
                     </span>
                   </div>
 
-                  {/* Preset Buttons: 10, 15, 20, 25, 30 */}
-                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                    {[10, 15, 20, 25, 30].map((num) => (
+                  {/* Preset Buttons */}
+                  <div className={`grid gap-1.5 sm:gap-2 ${quizMode === 'recall' ? 'grid-cols-5' : 'grid-cols-5'}`}>
+                    {(quizMode === 'recall'
+                      ? [10, 15, 20, 30, chemistryFormulas.length]
+                      : [10, 15, 20, 25, 30]
+                    ).map((num) => (
                       <button
                         key={num}
                         type="button"
                         onClick={() => setQuestionCount(num)}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                        className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           questionCount === num
                             ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs scale-102'
                             : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-100/60'
                         }`}
                       >
-                        {num} টি
+                        {num === chemistryFormulas.length ? 'সবগুলো' : `${num} টি`}
                       </button>
                     ))}
                   </div>
 
-                  {/* Range Slider for custom 10-30 selection */}
+                  {/* Range Slider */}
                   <div className="pt-2">
                     <input
                       type="range"
                       min={10}
-                      max={30}
+                      max={quizMode === 'recall' ? chemistryFormulas.length : 30}
                       step={1}
                       value={questionCount}
                       onChange={(e) => setQuestionCount(Number(e.target.value))}
                       className="w-full accent-emerald-600 cursor-pointer h-2 bg-emerald-200 rounded-lg"
                     />
                     <div className="flex justify-between text-[10px] font-mono text-emerald-700/80 mt-1">
-                      <span>১০ টি প্রশ্ন</span>
-                      <span>২০ টি প্রশ্ন</span>
-                      <span>৩০ টি প্রশ্ন</span>
+                      <span>১০ টি</span>
+                      <span>২০ টি</span>
+                      <span>{quizMode === 'recall' ? `${chemistryFormulas.length} টি (সব)` : '৩০ টি'}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Mode Selector */}
+                {/* Mode Selector - 3 Modes */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-emerald-950">পরীক্ষার মোড বেছে নিন:</label>
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {/* Mode 1: Exam Mode */}
                     <button
                       type="button"
                       onClick={() => setQuizMode('exam')}
-                      className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                         quizMode === 'exam'
                           ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
                           : 'bg-white border-emerald-100 hover:border-emerald-200'
@@ -479,18 +573,19 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                       <div className="flex items-center gap-2 mb-1">
                         <Timer className="w-4 h-4 text-emerald-600" />
                         <span className="text-xs sm:text-sm font-bold text-emerald-950">
-                          মডেল এক্সাম মোড
+                          মডেল এক্সাম (MCQ)
                         </span>
                       </div>
                       <p className="text-[11px] text-emerald-700/80 leading-relaxed">
-                        টাইমারসহ রিয়েল টেস্ট। শেষে পূর্ণাঙ্গ মার্ক ও সঠিক উত্তর শিট পাবেন।
+                        টাইমারসহ ৪টি অপশন। শেষে পূর্ণাঙ্গ মার্ক ও উত্তর শিট।
                       </p>
                     </button>
 
+                    {/* Mode 2: Practice Mode */}
                     <button
                       type="button"
                       onClick={() => setQuizMode('practice')}
-                      className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                         quizMode === 'practice'
                           ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
                           : 'bg-white border-emerald-100 hover:border-emerald-200'
@@ -499,23 +594,127 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                       <div className="flex items-center gap-2 mb-1">
                         <Flame className="w-4 h-4 text-amber-600" />
                         <span className="text-xs sm:text-sm font-bold text-emerald-950">
-                          অনুশীলন মোড
+                          অনুশীলন মোড (MCQ)
                         </span>
                       </div>
                       <p className="text-[11px] text-emerald-700/80 leading-relaxed">
-                        অপশন সিলেক্ট করার সাথে সাথেই সঠিক উত্তর ও রাসায়নিক নাম দেখা যাবে।
+                        অপশন সিলেক্ট করার সাথেই সঠিক উত্তর ও ব্যাখ্যা দৃশ্যমান।
+                      </p>
+                    </button>
+
+                    {/* Mode 3: Recall / Reveal Mode (New) */}
+                    <button
+                      type="button"
+                      onClick={() => setQuizMode('recall')}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                        quizMode === 'recall'
+                          ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                          : 'bg-white border-emerald-100 hover:border-emerald-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Eye className="w-4 h-4 text-emerald-600" />
+                          <span className="text-xs sm:text-sm font-bold text-emerald-950">
+                            রিভেল আনসার মোড
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950">
+                          নতুন
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700/80 leading-relaxed">
+                        কোনো অপশন থাকবে না! মনে মনে উত্তর ভেবে ‘রিভেল আনসার’ বাটনে যাচাই করবেন।
                       </p>
                     </button>
                   </div>
                 </div>
 
-                {/* Start Exam Button */}
+                {/* Sub-selector for Recall Mode */}
+                {quizMode === 'recall' && (
+                  <div className="p-4 rounded-2xl bg-radial from-emerald-500/10 via-white to-white border-2 border-emerald-300 space-y-3 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-1.5">
+                        <Brain className="w-4 h-4 text-emerald-600" />
+                        <span>রিভেল আনসার মোডের ধরন বেছে নিন:</span>
+                      </label>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        অপশনহীন মেমোরি টেস্ট
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {/* Option 1: নাম থেকে সংকেত */}
+                      <button
+                        type="button"
+                        onClick={() => setRecallDirection('name_to_formula')}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                          recallDirection === 'name_to_formula'
+                            ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                            : 'bg-white border-emerald-100 hover:border-emerald-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-sm">🏷️</span>
+                          <span className="text-xs font-bold text-emerald-950">নাম ➔ সংকেত</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700/80 leading-relaxed">
+                          কুইজের মতো বাণিজ্যিক নাম প্রশ্ন করবে, মনে মনে সংকেত ভাববেন ও রিভেল করবেন।
+                        </p>
+                      </button>
+
+                      {/* Option 2: সংকেত থেকে রাসায়নিক নাম */}
+                      <button
+                        type="button"
+                        onClick={() => setRecallDirection('formula_to_name')}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                          recallDirection === 'formula_to_name'
+                            ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                            : 'bg-white border-emerald-100 hover:border-emerald-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-sm">🧪</span>
+                          <span className="text-xs font-bold text-emerald-950">সংকেত ➔ রাসায়নিক নাম</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700/80 leading-relaxed">
+                          সংকেত দেওয়া থাকবে, মনে মনে রাসায়নিক নাম ভাববেন ও রিভেল করবেন।
+                        </p>
+                      </button>
+
+                      {/* Option 3: মিক্সড */}
+                      <button
+                        type="button"
+                        onClick={() => setRecallDirection('mixed')}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                          recallDirection === 'mixed'
+                            ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                            : 'bg-white border-emerald-100 hover:border-emerald-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-sm">🔀</span>
+                          <span className="text-xs font-bold text-emerald-950">মিক্সড (উভয় প্রকার)</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700/80 leading-relaxed">
+                          নাম থেকে সংকেত এবং সংকেত থেকে নাম—উভয় ধরনের প্রশ্নই পর্যায়ক্রমে আসবে।
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Start Quiz Button */}
                 <button
                   onClick={handleStartQuiz}
                   className="w-full py-3.5 rounded-xl font-bold text-sm sm:text-base bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/20 hover:shadow-md transition-all cursor-pointer"
                 >
                   <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-                  <span>কুইজ শুরু করুন ({questionCount} টি প্রশ্ন)</span>
+                  <span>
+                    {quizMode === 'recall'
+                      ? `রিভেল অনুশীলন শুরু করুন (${questionCount} টি সংকেত)`
+                      : `কুইজ শুরু করুন (${questionCount} টি প্রশ্ন)`}
+                  </span>
                 </button>
               </div>
 
@@ -523,17 +722,338 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
               <div className="p-4 rounded-2xl bg-white border border-emerald-100 text-xs text-emerald-900/80 space-y-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-xs mb-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>কুইজ সম্পর্কিত তথ্য:</span>
+                  <span>
+                    {quizMode === 'recall'
+                      ? 'রিভেল আনসার মোড কীভাবে কাজ করবে:'
+                      : 'কুইজ সম্পর্কিত তথ্য:'}
+                  </span>
                 </div>
-                <p>• প্রতিটি প্রশ্নের সঠিক রাসায়নিক সংকেত ৪টি অপশন থেকে নির্বাচন করতে হবে।</p>
-                <p>• বাণিজ্যিক নাম (যেমন: অয়েল অব ভিট্রিওল, লাফিং গ্যাস, বোরাক্স ইত্যাদি) থেকে সংকেত যাচাই করা হবে।</p>
-                <p>• ডুয়েট ভর্তি পরীক্ষায় বিগত বছরগুলোতে আসা প্রশ্নগুলো অন্তর্ভুক্ত করা রয়েছে।</p>
+                {quizMode === 'recall' ? (
+                  <>
+                    <p>• কোনো অপশন থাকবে না! প্রশ্ন দেখার পর নিজের মনে মনেই সঠিক উত্তরটি চিন্তা করবেন বা বলবেন।</p>
+                    <p>• উত্তর ভাবা শেষ হলে ‘রিভেল আনসার’ বাটনে ক্লিক করে সঠিক উত্তর ও রাসায়নিক নাম মিলিয়ে নিবেন।</p>
+                    <p>• এরপর ‘পরবর্তী প্রশ্ন’ বাটনে ক্লিক করলে নতুন প্রশ্ন আসবে এবং উত্তর লুকানো থাকবে।</p>
+                  </>
+                ) : (
+                  <>
+                    <p>• প্রতিটি প্রশ্নের সঠিক রাসায়নিক সংকেত ৪টি অপশন থেকে নির্বাচন করতে হবে।</p>
+                    <p>• বাণিজ্যিক নাম (যেমন: অয়েল অব ভিট্রিওল, লাফিং গ্যাস, বোরাক্স ইত্যাদি) থেকে সংকেত যাচাই করা হবে।</p>
+                    <p>• ডুয়েট ভর্তি পরীক্ষায় বিগত বছরগুলোতে আসা প্রশ্নগুলো অন্তর্ভুক্ত করা রয়েছে।</p>
+                  </>
+                )}
               </div>
             </div>
           )}
 
-          {/* Phase 2: Active Quiz */}
-          {quizPhase === 'active' && currentQ && (
+          {/* Phase 2: Active Quiz - Recall Mode (No MCQ Options, Reveal Answer) */}
+          {quizPhase === 'active' && quizMode === 'recall' && currentRecallQ && (
+            <div className="space-y-4">
+              {/* Quiz Status Header */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-emerald-100 shadow-2xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                    প্রশ্ন {currentIndex + 1} / {recallQuestions.length}
+                  </span>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    {currentRecallQ.direction === 'name_to_formula'
+                      ? '🏷️ নাম ➔ সংকেত'
+                      : '🧪 সংকেত ➔ রাসায়নিক নাম'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleFinishQuiz}
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
+                >
+                  অনুশীলন সমাপ্ত
+                </button>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-emerald-100 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-600 h-full transition-all duration-300"
+                  style={{ width: `${((currentIndex + 1) / recallQuestions.length) * 100}%` }}
+                />
+              </div>
+
+              {/* Question Card */}
+              <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-emerald-200 shadow-xs space-y-5">
+                {/* Badges row */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {currentRecallQ.duetRef && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                        <GraduationCap className="w-3 h-3 text-amber-600" />
+                        <span>{currentRecallQ.duetRef}</span>
+                      </span>
+                    )}
+                    {currentRecallQ.category && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {currentRecallQ.category}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                    <Brain className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>সেলফ-রিকল টেস্ট</span>
+                  </span>
+                </div>
+
+                {/* Question Content */}
+                {currentRecallQ.direction === 'name_to_formula' ? (
+                  /* Task 1: Name given, mentally recall chemical formula */
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1">
+                      <span className="text-[11px] font-bold text-emerald-700 block uppercase tracking-wider">
+                        প্রচলিত / বাণিজ্যিক নাম
+                      </span>
+                      <h2 className="text-lg sm:text-xl font-extrabold text-emerald-950">
+                        ‘{currentRecallQ.commonName}’ এর সঠিক রাসায়নিক সংকেত কোনটি?
+                      </h2>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-950 text-xs flex items-start gap-2.5">
+                      <span className="text-base flex-shrink-0">💭</span>
+                      <p className="leading-relaxed">
+                        <strong>আপনার কাজ:</strong> কোনো অপশন ছাড়াই নিজের মনে মনে এই যৌগটির রাসায়নিক সংকেত চিন্তা করুন বা উচ্চারণ করুন। ভাবা শেষ হলে নিচে ‘রিভেল আনসার’ বাটনে ক্লিক করুন।
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Task 2: Formula given, mentally recall chemical name */
+                  <div className="space-y-3">
+                    <div className="p-5 rounded-2xl bg-radial from-emerald-500/10 via-emerald-50/50 to-white border-2 border-emerald-300 text-center shadow-xs space-y-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">
+                        রাসায়নিক সংকেত
+                      </span>
+                      <div className="text-2xl sm:text-4xl font-black font-mono text-emerald-950 tracking-wider py-1 select-all">
+                        {currentRecallQ.formula}
+                      </div>
+                      <p className="text-xs text-emerald-800 font-medium">
+                        এই সংকেতটির রাসায়নিক নাম ও সাধারণ নাম কী?
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-teal-50/90 border border-teal-200/80 text-teal-950 text-xs flex items-start gap-2.5">
+                      <span className="text-base flex-shrink-0">💭</span>
+                      <p className="leading-relaxed">
+                        <strong>আপনার কাজ:</strong> সংকেতটি দেখে নিজের মনে মনে এর সঠিক রাসায়নিক নাম (যেমন: সালফেট, অক্সাইড, এসিড ইত্যাদি) বলুন। ভাবা শেষ হলে নিচে ‘রিভেল আনসার’ বাটনে ক্লিক করুন।
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reveal Answer Section */}
+                {!recallRevealed[currentIndex] ? (
+                  <div className="pt-2 text-center space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setRecallRevealed((prev) => ({ ...prev, [currentIndex]: true }))}
+                      className="w-full py-4 px-5 rounded-2xl font-extrabold text-sm sm:text-base bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center gap-2.5 shadow-md shadow-emerald-600/25 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+                    >
+                      <Eye className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <span>রিভেল আনসার (Reveal Answer)</span>
+                    </button>
+                    <p className="text-[11px] text-emerald-700/80">
+                      মনে মনে উত্তর ঠিক করে বাটনে চাপ দিলে সমাধান উন্মোচিত হবে
+                    </p>
+                  </div>
+                ) : (
+                  <div className="pt-2 space-y-3.5 animate-in fade-in-50 zoom-in-95 duration-200">
+                    {/* Revealed Answer Card */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-radial from-emerald-50 via-white to-white border-2 border-emerald-400 shadow-xs space-y-3.5">
+                      <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                        <span className="text-xs font-extrabold text-emerald-900 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>সঠিক সমাধান ও পরিচিতি:</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setRecallRevealed((prev) => ({ ...prev, [currentIndex]: false }))}
+                          className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
+                        >
+                          <EyeOff className="w-3.5 h-3.5" />
+                          <span>উত্তর লুকান</span>
+                        </button>
+                      </div>
+
+                      {/* Answer Details */}
+                      {currentRecallQ.direction === 'name_to_formula' ? (
+                        <div className="space-y-3">
+                          <div className="p-3.5 rounded-xl bg-emerald-100/90 border border-emerald-300 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
+                                সঠিক রাসায়নিক সংকেত
+                              </span>
+                              <span className="text-xl sm:text-2xl font-black font-mono text-emerald-950">
+                                {currentRecallQ.formula}
+                              </span>
+                            </div>
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white shadow-2xs">
+                              সঠিক সংকেত
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                              <span className="text-[10px] text-emerald-700 font-semibold block">রাসায়নিক নাম:</span>
+                              <span className="font-bold text-emerald-950">{currentRecallQ.chemicalName}</span>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                              <span className="text-[10px] text-emerald-700 font-semibold block">বাণিজ্যিক নাম:</span>
+                              <span className="font-bold text-emerald-950">{currentRecallQ.commonName}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3.5 rounded-xl bg-emerald-100/90 border border-emerald-300 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
+                                সঠিক রাসায়নিক নাম
+                              </span>
+                              <span className="text-lg sm:text-xl font-extrabold text-emerald-950">
+                                {currentRecallQ.chemicalName}
+                              </span>
+                            </div>
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white shadow-2xs">
+                              সঠিক নাম
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                              <span className="text-[10px] text-emerald-700 font-semibold block">বাণিজ্যিক নাম:</span>
+                              <span className="font-bold text-emerald-950">{currentRecallQ.commonName}</span>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                              <span className="text-[10px] text-emerald-700 font-semibold block">সংকেত:</span>
+                              <span className="font-bold font-mono text-emerald-950 text-sm">{currentRecallQ.formula}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Note */}
+                      <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 text-xs text-emerald-800 leading-relaxed font-sans">
+                        <span className="font-bold text-emerald-900 block mb-0.5">📌 ডুয়েট স্পেশাল নোট:</span>
+                        {currentRecallQ.explanation}
+                      </div>
+
+                      {/* Self Rating */}
+                      <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-xs font-semibold text-emerald-900">
+                          মনে মনে কি সঠিক ভেবেছিলেন?
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setRecallFeedback((prev) => ({ ...prev, [currentIndex]: 'correct' }))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                              recallFeedback[currentIndex] === 'correct'
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                            }`}
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                            <span>পেরেছি</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRecallFeedback((prev) => ({ ...prev, [currentIndex]: 'wrong' }))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                              recallFeedback[currentIndex] === 'wrong'
+                                ? 'bg-rose-600 text-white shadow-xs'
+                                : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+                            }`}
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                            <span>মনে আসেনি</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Navigation: Prev & Next */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-emerald-100">
+                  <button
+                    onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
+                    disabled={currentIndex === 0}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                      currentIndex === 0
+                        ? 'text-slate-300 cursor-not-allowed'
+                        : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 cursor-pointer'
+                    }`}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>পূর্ববর্তী</span>
+                  </button>
+
+                  {currentIndex < recallQuestions.length - 1 ? (
+                    <button
+                      onClick={() => setCurrentIndex((p) => Math.min(recallQuestions.length - 1, p + 1))}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    >
+                      <span>পরবর্তী প্রশ্ন</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleFinishQuiz}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    >
+                      <span>অনুশীলন শেষ করুন</span>
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Question Grid Quick Jump */}
+              <div className="p-3.5 rounded-2xl bg-white border border-emerald-100 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-emerald-950">
+                  <span>প্রশ্ন তালিকা:</span>
+                  <span className="text-[11px] font-normal text-emerald-700">
+                    রিভেল করা হয়েছে: {Object.keys(recallRevealed).filter((k) => recallRevealed[Number(k)]).length} / {recallQuestions.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {recallQuestions.map((_, qIdx) => {
+                    const isCurrent = currentIndex === qIdx;
+                    const fb = recallFeedback[qIdx];
+                    const isRev = !!recallRevealed[qIdx];
+
+                    let btnClass = 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100';
+                    if (fb === 'correct') {
+                      btnClass = 'bg-emerald-600 text-white font-bold';
+                    } else if (fb === 'wrong') {
+                      btnClass = 'bg-rose-500 text-white font-bold';
+                    } else if (isRev) {
+                      btnClass = 'bg-emerald-200 text-emerald-950 border border-emerald-400 font-bold';
+                    }
+
+                    return (
+                      <button
+                        key={qIdx}
+                        onClick={() => setCurrentIndex(qIdx)}
+                        className={`w-8 h-8 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${btnClass} ${
+                          isCurrent ? 'ring-2 ring-emerald-500 ring-offset-1 scale-105 shadow-xs' : ''
+                        }`}
+                      >
+                        {qIdx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Phase 2: Active Quiz - MCQ Mode (Exam & Practice) */}
+          {quizPhase === 'active' && quizMode !== 'recall' && currentQ && (
             <div className="space-y-4">
               {/* Quiz Status Header */}
               <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-emerald-100 shadow-2xs flex items-center justify-between gap-2">
@@ -729,8 +1249,155 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
             </div>
           )}
 
-          {/* Phase 3: Result & Detailed Review */}
-          {quizPhase === 'result' && (
+          {/* Phase 3: Result & Detailed Review - Recall Mode */}
+          {quizPhase === 'result' && quizMode === 'recall' && (
+            <div className="space-y-4">
+              {/* Score Card */}
+              <div className="p-6 rounded-2xl sm:rounded-3xl bg-white border border-emerald-200 shadow-xs text-center space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <Brain className="w-8 h-8 text-emerald-700" />
+                </div>
+
+                <div>
+                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                    সেলফ-রিকল প্রস্তুতি রিপোর্ট
+                  </span>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-emerald-950 font-mono mt-1">
+                    {recallStats.remembered} / {recallStats.total}
+                  </h2>
+                  <p className="text-xs text-emerald-800 mt-1">
+                    {recallStats.remembered + recallStats.forgot > 0
+                      ? `স্মৃতিতে সঠিক মনে পড়েছে: ${recallStats.percentage}% (${recallStats.remembered} টি)`
+                      : `মোট ${recallStats.total}টি সংকেত রিভেল করে অনুশীলন সম্পন্ন হয়েছে।`}
+                  </p>
+                </div>
+
+                {/* Stat Badges */}
+                <div className="grid grid-cols-3 gap-2 pt-2">
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <span className="block text-[10px] font-semibold text-emerald-700">মনে পড়েছে</span>
+                    <span className="text-base font-extrabold text-emerald-800 font-mono">
+                      {recallStats.remembered}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-100">
+                    <span className="block text-[10px] font-semibold text-rose-700">ভুলে গিয়েছিলেন</span>
+                    <span className="text-base font-extrabold text-rose-800 font-mono">
+                      {recallStats.forgot}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="block text-[10px] font-semibold text-slate-600">রেটিং ছাড়া</span>
+                    <span className="text-base font-extrabold text-slate-800 font-mono">
+                      {recallStats.unrated}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Performance Message */}
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 text-xs text-emerald-900 leading-relaxed">
+                  {recallStats.remembered >= recallStats.total * 0.8 ? (
+                    <span className="font-semibold text-emerald-900">
+                      🎉 চমৎকার মেমোরি রিকল! বাণিজ্যিক নাম ও রাসায়নিক সংকেত উভয় দিকেই আপনার প্রস্তুতি দারুণ।
+                    </span>
+                  ) : (
+                    <span>
+                      💡 যেসব সংকেত বা নাম মনে পড়েনি, সেগুলো নিচের তালিকা থেকে আরেকবার রিভিশন দিয়ে আবার রিভেল টেস্ট দিন!
+                    </span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  <button
+                    onClick={handleRetake}
+                    className="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>আবার অনুশীলন করুন</span>
+                  </button>
+                  <button
+                    onClick={handleBackToSetup}
+                    className="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
+                  >
+                    মোড / সেটিংস পরিবর্তন
+                  </button>
+                </div>
+              </div>
+
+              {/* All Reviewed Formulas List */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-emerald-950 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>অনুশীলন করা সংকেতসমূহের তালিকা ({recallQuestions.length}টি):</span>
+                </h3>
+
+                <div className="space-y-2.5">
+                  {recallQuestions.map((q, idx) => {
+                    const fb = recallFeedback[idx];
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-2xl bg-white border transition-all ${
+                          fb === 'correct'
+                            ? 'border-emerald-300'
+                            : fb === 'wrong'
+                            ? 'border-rose-300'
+                            : 'border-emerald-100'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                              #{idx + 1}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              {q.direction === 'name_to_formula' ? 'নাম ➔ সংকেত' : 'সংকেত ➔ নাম'}
+                            </span>
+                            {q.duetRef && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                {q.duetRef}
+                              </span>
+                            )}
+                          </div>
+                          {fb === 'correct' ? (
+                            <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> মনে পড়েছে
+                            </span>
+                          ) : fb === 'wrong' ? (
+                            <span className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
+                              <XCircle className="w-3.5 h-3.5" /> ভুলে গিয়েছিলেন
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-slate-500">রিভিউড</span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mb-2">
+                          <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200">
+                            <span className="text-[10px] text-emerald-700 block font-semibold">রাসায়নিক সংকেত:</span>
+                            <span className="font-mono font-bold text-emerald-950 text-sm">{q.formula}</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                            <span className="text-[10px] text-emerald-700 block font-semibold">বাণিজ্যিক ও রাসায়নিক নাম:</span>
+                            <span className="font-bold text-emerald-950 text-xs block">{q.commonName}</span>
+                            <span className="text-[11px] text-emerald-800 block">({q.chemicalName})</span>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-emerald-800/90 bg-emerald-50/40 p-2 rounded-lg border border-emerald-100">
+                          {q.explanation}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Phase 3: Result & Detailed Review - MCQ Mode */}
+          {quizPhase === 'result' && quizMode !== 'recall' && (
             <div className="space-y-4">
               {/* Score Card */}
               <div className="p-6 rounded-2xl sm:rounded-3xl bg-white border border-emerald-200 shadow-xs text-center space-y-4">
