@@ -144,4 +144,5 @@ export type AppView =
   | 'study_graph'
   | 'study_tasks'
   | 'chemistry'
+  | 'radicals'
   | 'schedules';

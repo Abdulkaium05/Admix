@@ -37,20 +37,24 @@ import {
   ChemistryCompound,
 } from '../data/chemistryFormulas';
 import { ElementValencyQuiz } from './ElementValencyQuiz';
+import { RadicalsScreen } from './RadicalsScreen';
+import { radicalsData } from '../data/radicalsData';
 import { Language } from '../utils/i18n';
 
 interface ChemistryScreenProps {
   language: Language;
   onBack: () => void;
+  onNavigateToRadicals?: () => void;
 }
 
-type ChemistryView = 'hub' | 'elements' | 'quiz' | 'formulas';
+type ChemistryView = 'hub' | 'elements' | 'quiz' | 'formulas' | 'radicals';
 type QuizPhase = 'setup' | 'active' | 'result';
 type QuizMode = 'practice' | 'exam' | 'recall';
 
-export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBack }) => {
-  // Navigation: Default to 'hub' landing screen showing two big cards
+export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBack, onNavigateToRadicals }) => {
+  // Navigation: Default to 'hub' landing screen showing options
   const [currentView, setCurrentView] = useState<ChemistryView>('hub');
+  const [radicalsInitialTab, setRadicalsInitialTab] = useState<'quiz' | 'recall' | 'sheet'>('quiz');
 
   // Quiz Settings State
   const [questionCount, setQuestionCount] = useState<number>(15); // Default 15 (between 10-30 or all 64)
@@ -260,13 +264,15 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
             </div>
             <p className="text-[11px] text-emerald-700/80">
               {currentView === 'hub'
-                ? 'মৌলের গ্রুপ-যোজনী এবং রাসায়নিক সংকেত প্রস্তুতি'
+                ? 'মৌলের গ্রুপ-যোজনী, রাসায়নিক সংকেত ও যৌগমূলক প্রস্তুতি'
                 : currentView === 'elements'
                 ? 'মৌলের গ্রুপ সংখ্যা ও পরিবর্তনশীল যোজনী কুইজ'
                 : currentView === 'quiz'
                 ? quizMode === 'recall'
                   ? 'অপশনহীন রিভেল আনসার মেমোরি টেস্ট'
                   : 'বাণিজ্যিক ও রাসায়নিক সংকেত কুইজ'
+                : currentView === 'radicals'
+                ? 'যৌগমূলকের সংকেত, যোজনী কুইজ ও রিভেল টেস্ট'
                 : 'সকল রাসায়নিক সংকেত ভাণ্ডার ও স্টাডি শিট'}
             </p>
           </div>
@@ -283,7 +289,7 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
         )}
       </div>
 
-      {/* ======================= VIEW: HUB (TWO BIG BEAUTIFUL CARDS) ======================= */}
+      {/* ======================= VIEW: HUB (THREE BIG CARDS & STUDY SHEETS) ======================= */}
       {currentView === 'hub' && (
         <div className="space-y-4 animate-in fade-in-50 duration-200">
           <div className="text-center py-2 space-y-1">
@@ -291,11 +297,11 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
               কোন বিষয়টি অনুশীলন করতে চান?
             </h2>
             <p className="text-xs text-emerald-700/80">
-              নিচের যে কোনো একটি অপশনে ট্যাপ করে প্র্যাকটিস শুরু করুন
+              নিচের যে কোনো একটি অপশনে ট্যাপ করে প্র্যাকটিস বা রিভেল টেস্ট শুরু করুন
             </p>
           </div>
 
-          {/* TWO BIG CARDS GRID */}
+          {/* THREE CARDS GRID */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
             {/* Card 1: মৌলের গ্রুপ ও যোজনী */}
             <button
@@ -386,36 +392,130 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* Quick link to সংকেত ভাণ্ডার study sheet */}
-          <div className="p-4 rounded-2xl bg-white border border-emerald-200 shadow-2xs flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0">
-                <BookOpen className="w-5 h-5" />
+            {/* Card 3: যৌগমূলক (Radical) কুইজ ও রিভেল মোড */}
+            <div className="w-full text-left p-5 sm:p-6 rounded-3xl bg-radial from-amber-500/10 via-white to-white border-2 border-emerald-200 hover:border-amber-500 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden sm:col-span-2">
+              <div className="space-y-3 relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="w-13 h-13 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <Sparkles className="w-7 h-7 text-amber-700" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                      {radicalsData.length}টি যৌগমূলক
+                    </span>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-2xs">
+                      নতুন সেকশন
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-emerald-950 flex items-center gap-1.5">
+                    <span>যৌগমূলক (Radical) : প্রতীক, সংকেত ও যোজনী</span>
+                  </h3>
+                  <p className="text-xs text-emerald-700/90 mt-1 leading-relaxed">
+                    ডুয়েট ভর্তি পরীক্ষার সকল একযোজী, দ্বিযোজী, ত্রিযোজী ও চতুৰ্থযোজী যৌগমূলকের নাম দেওয়া থাকবে আর ৪টি অপশনসহ MCQ কুইজ এবং কোনো অপশন ছাড়া মনে মনে উত্তর দিয়ে ‘রিভেল আনসার’ সেলফ-টেস্ট।
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
-                  রাসায়নিক সংকেত ভাণ্ডার (Study Sheet)
-                </h4>
-                <p className="text-[11px] text-emerald-700/80">
-                  পরীক্ষার আগে এক নজরে সবকটি ৬০+ সংকেত ও বিগত সালের প্রশ্ন পড়ে নিন
-                </p>
+
+              <div className="pt-4 mt-4 border-t border-emerald-100/80 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRadicalsInitialTab('quiz');
+                    setCurrentView('radicals');
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>MCQ কুইজ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRadicalsInitialTab('recall');
+                    setCurrentView('radicals');
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>রিভেল টেস্ট (অপশনহীন)</span>
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-amber-300 text-amber-950 font-black">নতুন</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRadicalsInitialTab('sheet');
+                    setCurrentView('radicals');
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>স্টাডি শিট ({radicalsData.length})</span>
+                </button>
               </div>
             </div>
-            <button
-              onClick={() => setCurrentView('formulas')}
-              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 transition-colors flex-shrink-0 cursor-pointer"
-            >
-              সংকেত তালিকা
-            </button>
+          </div>
+
+          {/* Quick Study Sheet Links */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Quick link 1: সংকেত ভাণ্ডার study sheet */}
+            <div className="p-4 rounded-2xl bg-white border border-emerald-200 shadow-2xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
+                    রাসায়নিক সংকেত ভাণ্ডার
+                  </h4>
+                  <p className="text-[11px] text-emerald-700/80">
+                    সবকটি ৬০+ সংকেত ও বিগত সালের প্রশ্ন
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCurrentView('formulas')}
+                className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 transition-colors flex-shrink-0 cursor-pointer"
+              >
+                সংকেত তালিকা
+              </button>
+            </div>
+
+            {/* Quick link 2: যৌগমূলক ভাণ্ডার ও চার্ট */}
+            <div className="p-4 rounded-2xl bg-white border border-emerald-200 shadow-2xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
+                    যৌগমূলক ভাণ্ডার ও চার্ট
+                  </h4>
+                  <p className="text-[11px] text-emerald-700/80">
+                    ৪৯টি যৌগমূলকের প্রতীক, সংকেত ও যোজনী
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRadicalsInitialTab('sheet');
+                  setCurrentView('radicals');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 transition-colors flex-shrink-0 cursor-pointer"
+              >
+                যৌগমূলক শিট
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Sub-Navigation Switcher (Visible only inside sub-screens for quick jumping) */}
       {currentView !== 'hub' && (
-        <div className="grid grid-cols-4 gap-1 p-1 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1 p-1 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl">
           <button
             onClick={() => setCurrentView('elements')}
             className={`py-2 px-1 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all cursor-pointer ${
@@ -455,8 +555,21 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
             }`}
           >
             <Eye className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            <span className="truncate">রিভেল মোড</span>
-            <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-100 text-amber-800 hidden sm:inline">নতুন</span>
+            <span className="truncate">সংকেত রিভেল</span>
+          </button>
+          <button
+            onClick={() => {
+              setCurrentView('radicals');
+            }}
+            className={`py-2 px-1 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all cursor-pointer ${
+              currentView === 'radicals'
+                ? 'bg-white text-emerald-950 shadow-xs border border-emerald-200'
+                : 'text-emerald-700 hover:text-emerald-950'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="truncate">যৌগমূলক</span>
+            <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-200 text-amber-900 hidden sm:inline">নতুন</span>
           </button>
           <button
             onClick={() => setCurrentView('formulas')}
@@ -467,7 +580,7 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            <span className="truncate">সংকেত ভাণ্ডার</span>
+            <span className="truncate">সংকেত তালিকা</span>
           </button>
         </div>
       )}
@@ -475,6 +588,16 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
       {/* ======================= TAB 0: ELEMENTS GROUP & VALENCY QUIZ ======================= */}
       {currentView === 'elements' && (
         <ElementValencyQuiz language={language} />
+      )}
+
+      {/* ======================= TAB: RADICALS (যৌগমূলক) ======================= */}
+      {currentView === 'radicals' && (
+        <RadicalsScreen
+          language={language}
+          onBack={() => setCurrentView('hub')}
+          hideHeader={true}
+          initialTab={radicalsInitialTab}
+        />
       )}
 
       {/* ======================= TAB 1: QUIZ SYSTEM ======================= */}

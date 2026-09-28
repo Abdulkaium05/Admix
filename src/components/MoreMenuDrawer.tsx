@@ -220,6 +220,24 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
             </span>
           </button>
 
+          {/* Radicals (যৌগমূলক) Feature */}
+          <button
+            onClick={() => handleNav('radicals')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              currentView === 'radicals'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-emerald-900 hover:bg-emerald-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <span>{language === 'bn' ? 'যৌগমূলক (Radicals)' : 'Radicals (যৌগমূলক)'}</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold">
+              {language === 'bn' ? 'কুইজ ও রিভেল' : 'Quiz & Reveal'}
+            </span>
+          </button>
+
           {/* Study Tasks Planner Feature */}
           <button
             onClick={() => handleNav('study_tasks')}
