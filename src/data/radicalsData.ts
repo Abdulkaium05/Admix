@@ -293,7 +293,7 @@ export const radicalsData: RadicalItem[] = [
   },
   {
     id: "sulfite",
-    group: "B",
+    group: "A",
     nameBn: 'সালফাইট',
     nameEn: 'Sulfite',
     formula: 'SO₃²⁻',
@@ -438,7 +438,7 @@ export const radicalsData: RadicalItem[] = [
   // =================== যোজনী ৩ (ত্রিযোজী মূলক) ===================
   {
     id: "phosphite",
-    group: "B",
+    group: "A",
     nameBn: 'ফসফাইট',
     nameEn: 'Phosphite',
     formula: 'PO₃³⁻',
@@ -576,7 +576,7 @@ export const radicalsData: RadicalItem[] = [
   },
   {
     id: "phosphide",
-    group: "A",
+    group: "B",
     nameBn: 'ফসফাইড',
     nameEn: 'Phosphide',
     formula: 'P',
@@ -587,7 +587,7 @@ export const radicalsData: RadicalItem[] = [
   },
   {
     id: "sulfide",
-    group: "A",
+    group: "B",
     nameBn: 'সালফাইড',
     nameEn: 'Sulfide',
     formula: 'S',
