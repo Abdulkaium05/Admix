@@ -1133,7 +1133,7 @@ export function generateIdiomsRecall(
         idiomId: item.id,
         direction: 'phrase_to_meaning',
         promptTitle: item.phrase,
-        promptSubtitle: `ক্রমিক #${item.id} • উদাহরণ: ${item.example}`,
+        promptSubtitle: `ক্রমিক #${item.id} • মনে মনে সঠিক ইংরেজি ও বাংলা অর্থ চিন্তা করুন`,
         phrase: item.phrase,
         meaningEn: item.meaningEn,
         meaningBn: item.meaningBn,

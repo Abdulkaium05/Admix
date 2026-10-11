@@ -736,13 +736,10 @@ export const EnglishScreen: React.FC<EnglishScreenProps> = ({ language, onBack }
                       </span>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-1.5">
+                    <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100">
                       <div className="text-lg sm:text-xl font-extrabold text-emerald-950 font-mono">
                         “{currentQuizQ.phrase}”
                       </div>
-                      <p className="text-xs text-emerald-700 italic">
-                        Example: {currentQuizQ.example}
-                      </p>
                     </div>
 
                     <h2 className="text-sm sm:text-base font-bold text-emerald-950 leading-relaxed">
