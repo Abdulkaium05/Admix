@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ListTodo,
   FlaskConical,
+  BookOpen,
   CalendarClock,
 } from 'lucide-react';
 
@@ -221,6 +222,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {language === 'bn'
                   ? 'মৌলের গ্রুপ ও যোজনী, রাসায়নিক সংকেত এবং যৌগমূলক প্রস্তুতি'
                   : 'Element Valency, Chemical Formulas & Radicals Preparation'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 text-xs font-bold text-white bg-emerald-600 group-hover:bg-emerald-700 px-3 py-2 rounded-xl transition-colors shadow-2xs flex-shrink-0 whitespace-nowrap">
+            <span>{language === 'bn' ? 'প্রবেশ করুন' : 'Open'}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+      </div>
+
+      {/* 2.6 English (ইংরেজি) Quick Access Card */}
+      <div
+        onClick={() => onNavigate('english')}
+        className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-emerald-200 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer group relative overflow-hidden active:scale-[0.99]"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform border border-emerald-200/60">
+              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <span className="text-sm sm:text-base font-extrabold text-emerald-950 group-hover:text-emerald-700 transition-colors whitespace-nowrap">
+                  {language === 'bn' ? 'English (ইংরেজি)' : 'English'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap flex-shrink-0">
+                  {language === 'bn' ? 'Idiom and Phrase • ১৪২টি' : 'Idiom & Phrase • 142'}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-700/80 mt-0.5 leading-tight truncate sm:whitespace-normal">
+                {language === 'bn'
+                  ? '১৪২টি গুরুত্বপূর্ণ Idiom & Phrase — ১. MCQ এবং ২. Reveal Answer টেস্ট'
+                  : '142 Important Idioms & Phrases — 1. MCQ & 2. Reveal Answer Test'}
               </p>
             </div>
           </div>

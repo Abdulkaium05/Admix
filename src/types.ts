@@ -145,4 +145,5 @@ export type AppView =
   | 'study_tasks'
   | 'chemistry'
   | 'radicals'
+  | 'english'
   | 'schedules';

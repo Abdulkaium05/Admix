@@ -45,6 +45,7 @@ import { StudyGraphScreen } from './components/StudyGraphScreen';
 import { StudyTasksScreen } from './components/StudyTasksScreen';
 import { ChemistryScreen } from './components/ChemistryScreen';
 import { RadicalsScreen } from './components/RadicalsScreen';
+import { EnglishScreen } from './components/EnglishScreen';
 import { ScheduleScreen } from './components/ScheduleScreen';
 import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
 import { AuthScreen } from './components/AuthScreen';
@@ -515,6 +516,13 @@ export default function App() {
           <RadicalsScreen
             language={language}
             onBack={() => setCurrentView('chemistry')}
+          />
+        )}
+
+        {currentView === 'english' && (
+          <EnglishScreen
+            language={language}
+            onBack={() => setCurrentView('home')}
           />
         )}
 
