@@ -27,6 +27,7 @@ import {
   Cloud,
   FlaskConical,
   BookOpen,
+  FileText,
 } from 'lucide-react';
 
 interface MoreMenuDrawerProps {
@@ -236,6 +237,24 @@ export const MoreMenuDrawer: React.FC<MoreMenuDrawerProps> = ({
             </div>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold">
               {language === 'bn' ? 'Idiom & Phrase' : '142 Idioms'}
+            </span>
+          </button>
+
+          {/* Question Paper Generator & Bank Feature */}
+          <button
+            onClick={() => handleNav('question_generator')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              currentView === 'question_generator'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-emerald-900 hover:bg-emerald-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="w-4 h-4 text-emerald-600" />
+              <span>{language === 'bn' ? 'প্রশ্নপত্র জেনারেটর' : 'Question Generator'}</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold">
+              {language === 'bn' ? 'PDF তৈরি' : 'PDF Export'}
             </span>
           </button>
 

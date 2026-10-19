@@ -47,6 +47,7 @@ import { ChemistryScreen } from './components/ChemistryScreen';
 import { RadicalsScreen } from './components/RadicalsScreen';
 import { EnglishScreen } from './components/EnglishScreen';
 import { ScheduleScreen } from './components/ScheduleScreen';
+import { QuestionPaperGeneratorScreen } from './components/QuestionPaperGeneratorScreen';
 import { AdmissionCountdownModal } from './components/AdmissionCountdownModal';
 import { AuthScreen } from './components/AuthScreen';
 import { EngineerLogo } from './components/EngineerLogo';
@@ -537,6 +538,13 @@ export default function App() {
             onDeleteScheduleFromCloud={async (id) => {
               if (firebaseUser) await deleteScheduleFromCloud(firebaseUser.uid, id);
             }}
+          />
+        )}
+
+        {currentView === 'question_generator' && (
+          <QuestionPaperGeneratorScreen
+            language={language}
+            onBack={() => setCurrentView('home')}
           />
         )}
       </main>

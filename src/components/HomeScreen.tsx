@@ -3,7 +3,7 @@ import { UserProfile, DailyLimitInfo, AppView } from '../types';
 import { translations, Language } from '../utils/i18n';
 import { EngineerLogo } from './EngineerLogo';
 import { HomeScheduleTimers } from './HomeScheduleTimers';
-import { MAX_DAILY_EXAMS, getTodayStudyMinutes, formatDuration, getStudyTasks, getTodayDateString, getTomorrowDateString } from '../utils/storage';
+import { MAX_DAILY_EXAMS, getTodayStudyMinutes, formatDuration, getStudyTasks, getTodayDateString, getTomorrowDateString, getSavedQuestionBank } from '../utils/storage';
 import {
   Play,
   PlusCircle,
@@ -20,6 +20,7 @@ import {
   FlaskConical,
   BookOpen,
   CalendarClock,
+  FileText,
 } from 'lucide-react';
 
 interface HomeScreenProps {
@@ -262,6 +263,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <div className="flex items-center gap-1 text-xs font-bold text-white bg-emerald-600 group-hover:bg-emerald-700 px-3 py-2 rounded-xl transition-colors shadow-2xs flex-shrink-0 whitespace-nowrap">
             <span>{language === 'bn' ? 'প্রবেশ করুন' : 'Open'}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+      </div>
+
+      {/* 2.7 Question Paper Generator & Stored Question Bank Card */}
+      <div
+        onClick={() => onNavigate('question_generator')}
+        className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-emerald-200 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer group relative overflow-hidden active:scale-[0.99]"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform border border-emerald-200/60">
+              <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <span className="text-sm sm:text-base font-extrabold text-emerald-950 group-hover:text-emerald-700 transition-colors whitespace-nowrap">
+                  {language === 'bn' ? 'প্রশ্ন ব্যাংক ও প্রশ্নপত্র জেনারেটর' : 'Question Bank & Generator'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap flex-shrink-0">
+                  {language === 'bn' ? 'PDF ডাউনলোড' : 'PDF Export'}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-700/80 mt-0.5 leading-tight truncate sm:whitespace-normal">
+                {language === 'bn'
+                  ? 'অধ্যায় ও টাইপ বেছে ব্রাউজার স্টোরেজ থেকে র‍্যান্ডম প্রশ্নপত্র তৈরি ও সরাসরি PDF সেভ করুন'
+                  : 'Select chapters & types to generate custom random exam papers and save as PDF'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 text-xs font-bold text-white bg-emerald-600 group-hover:bg-emerald-700 px-3 py-2 rounded-xl transition-colors shadow-2xs flex-shrink-0 whitespace-nowrap">
+            <span>{language === 'bn' ? 'তৈরি করুন' : 'Create'}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </div>
         </div>

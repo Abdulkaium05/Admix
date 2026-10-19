@@ -132,6 +132,19 @@ export interface UpcomingSchedule {
   createdAt: number;
 }
 
+export interface SavedQuestionBankItem {
+  id: string;
+  chapter: string; // অধ্যায়ের নাম (Chapter Name)
+  type: string; // প্রশ্নের ধরন (Question Type e.g. গাণিতিক, সংক্ষিপ্ত, রচনামূলক, MCQ)
+  questionText: string; // মূল প্রশ্ন
+  marks?: number; // প্রশ্নের পূর্ণমান / মার্কস
+  solution?: string; // সমাধান বা উত্তর (ঐচ্ছিক)
+  subject?: string; // বিষয় (ঐচ্ছিক e.g. পদার্থ, গণিত, রসায়ন, সিভিল)
+  options?: [string, string, string, string]; // MCQ হলে ৪টি অপশন (ঐচ্ছিক)
+  correctOption?: number; // MCQ হলে সঠিক অপশন ইনডেক্স (ঐচ্ছিক)
+  createdAt: number;
+}
+
 export type AppView =
   | 'home'
   | 'exam'
@@ -146,4 +159,5 @@ export type AppView =
   | 'chemistry'
   | 'radicals'
   | 'english'
-  | 'schedules';
+  | 'schedules'
+  | 'question_generator';

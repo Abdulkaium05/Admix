@@ -29,3 +29,37 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #6ee7b7;
 }
+
+/* Print Styles for Question Paper PDF / Print */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide everything on the page except the printable paper element */
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-question-paper,
+  #printable-question-paper * {
+    visibility: visible;
+  }
+
+  #printable-question-paper {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

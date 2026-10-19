@@ -1,4 +1,4 @@
-import { UserProfile, QuizResult, Question, DailyLimitInfo, SemesterGrades, StudySession, StudyTask, UpcomingSchedule } from '../types';
+import { UserProfile, QuizResult, Question, DailyLimitInfo, SemesterGrades, StudySession, StudyTask, UpcomingSchedule, SavedQuestionBankItem } from '../types';
 import { defaultQuestions } from '../data/defaultQuestions';
 
 const PROFILE_KEY = 'duet_user_profile_v1';
@@ -1063,4 +1063,334 @@ export function calculateScheduleCountdown(
     };
   }
 }
+
+// =========================================================================
+// QUESTION BANK STORAGE & QUESTION PAPER GENERATOR
+// =========================================================================
+
+const QUESTION_BANK_KEY = 'duet_saved_question_bank_v1';
+
+export const DEFAULT_QUESTION_BANK_SEEDS: SavedQuestionBankItem[] = [
+  {
+    id: 'qb_vec_1',
+    chapter: 'ভেক্টর',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'দুটি সমমানের বলের লব্ধির মান এদের যেকোনো একটি বলের মানের সমান হলে, বলদ্বয়ের মধ্যবর্তী কোণ নির্ণয় কর।',
+    marks: 5,
+    solution: 'ধরি বল দুটি P এবং P। লব্ধি R = P।\nR² = P² + P² + 2·P·P·cosα\n=> P² = 2P² + 2P² cosα\n=> 2P² cosα = -P²\n=> cosα = -1/2 = cos 120°\n∴ মধ্যবর্তী কোণ α = 120°।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 5,
+  },
+  {
+    id: 'qb_vec_2',
+    chapter: 'ভেক্টর',
+    type: 'সংক্ষিপ্ত প্রশ্ন',
+    questionText: 'নাল ভেক্টর (Null Vector) কাকে বলে? এর দিক কীভাবে নির্ধারিত হয়?',
+    marks: 2.5,
+    solution: 'যে ভেক্টরের মান শূন্য তাকে নাল ভেক্টর বা শূন্য ভেক্টর বলে। নাল ভেক্টরের কোনো নির্দিষ্ট দিক নেই; এর পাদবিন্দু ও শীর্ষবিন্দু একই হওয়ায় এর দিক অনির্ধারিত।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 4,
+  },
+  {
+    id: 'qb_vec_3',
+    chapter: 'ভেক্টর',
+    type: 'বহুনির্বাচনী / MCQ',
+    questionText: 'A = 2i + 3j - k এবং B = -4i - 6j + 2k ভেক্টরদ্বয় পরস্পরের সাথে কীভাবে অবস্থান করে?',
+    marks: 1.5,
+    solution: 'B = -2(2i + 3j - k) = -2A। যেহেতু একটি ভেক্টর অন্যটির ঋণাত্মক স্কেলার গুণিতক, তাই এরা পরস্পর সমান্তরাল ও বিপরীতমুখী।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: 'qb_kin_1',
+    chapter: 'গতিবিদ্যা',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'একটি বুলেট কোনো কাঠের তক্তায় প্রবেশ করে এর বেগের অর্ধেক হারায়। বুলেটটি ওই তক্তার ভেতর আর কত দূর প্রবেশ করতে পারবে?',
+    marks: 5,
+    solution: 'ধরি আদি বেগ u এবং প্রথম ক্ষেত্রে অতিক্রান্ত দূরত্ব s।\n(u/2)² = u² - 2as => 2as = 3u²/4 => a = 3u²/(8s)।\nবাকি বেগ u/2 নিয়ে আর s\' দূরত্ব গিয়ে বেগ 0 হলে:\n0 = (u/2)² - 2as\' => 2as\' = u²/4 => s\' = (u²/4) / (2 · 3u²/(8s)) = s/3।\n∴ বুলেটটি আরও (s/3) দূরত্ব প্রবেশ করে থেমে যাবে।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 5,
+  },
+  {
+    id: 'qb_kin_2',
+    chapter: 'গতিবিদ্যা',
+    type: 'সংজ্ঞা ও সূত্র',
+    questionText: 'প্রাসের (Projectile) সর্বোচ্চ উচ্চতা এবং আনুভূমিক পাল্লার গাণিতিক সূত্র দুটি লিখ।',
+    marks: 3,
+    solution: 'সর্বোচ্চ উচ্চতা: H = (u² sin²θ) / (2g)\nআনুভূমিক পাল্লা: R = (u² sin 2θ) / g\nযেখানে u = প্রক্ষেপণ বেগ, θ = প্রক্ষেপণ কোণ, g = অভিকর্ষজ ত্বরণ।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 4,
+  },
+  {
+    id: 'qb_kin_3',
+    chapter: 'গতিবিদ্যা',
+    type: 'বহুনির্বাচনী / MCQ',
+    questionText: 'কোন প্রক্ষেপণ কোণে নিক্ষিপ্ত প্রাসের আনুভূমিক পাল্লা (Horizontal Range) সর্বোচ্চ হয়?',
+    marks: 1.5,
+    solution: 'R = (u² sin 2θ)/g। sin 2θ এর সর্বোচ্চ মান 1 হলে 2θ = 90° => θ = 45°। অর্থাৎ ৪৫° কোণে পাল্লা সর্বোচ্চ হয়।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 2,
+  },
+  {
+    id: 'qb_wep_1',
+    chapter: 'কাজ-ক্ষমতা-শক্তি',
+    type: 'গাণিতিক সমস্যা',
+    questionText: '৫ অশ্বক্ষমতার একটি পাম্প ২৫ মিটার গভীর কুয়া হতে প্রতি মিনিটে ২০০০ লিটার পানি উত্তোলন করে। পাম্পটির কার্যকর ক্ষমতা ও কর্মদক্ষতা নির্ণয় কর।',
+    marks: 5,
+    solution: 'কাজের পরিমাণ W = mgh = 2000 kg × 9.8 m/s² × 25 m = 490,000 J।\nকার্যকর ক্ষমতা P_out = W / t = 490,000 / 60 s = 8166.67 Watt।\nপ্রদত্ত ক্ষমতা P_in = 5 HP = 5 × 746 Watt = 3730 Watt (বা মোটর রেটিং অনুযায়ী হিসাব্য)।\nকর্মদক্ষতা η = (P_out / P_in) × 100%।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 5,
+  },
+  {
+    id: 'qb_wep_2',
+    chapter: 'কাজ-ক্ষমতা-শক্তি',
+    type: 'সংক্ষিপ্ত প্রশ্ন',
+    questionText: 'সংরক্ষণশীল বল ও অসংরক্ষণশীল বলের মধ্যে পার্থক্য লিখ। দুটি করে উদাহরণ দাও।',
+    marks: 4,
+    solution: '১. সংরক্ষণশীল বলে কোনো বস্তুকে যেকোনো পথে ঘুরিয়ে আদি অবস্থানে আনলে কৃতকাজ শূন্য হয়; অসংরক্ষণশীলে শূন্য হয় না।\n২. সংরক্ষণশীল বলে কাজ পথের ওপর নির্ভর করে না; অসংরক্ষণশীলে পথের ওপর নির্ভর করে।\nউদাহরণ: সংরক্ষণশীল: অভিকর্ষ বল, কুলম্ব বল। অসংরক্ষণশীল: ঘর্ষণ বল, সান্দ্র বল।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 4,
+  },
+  {
+    id: 'qb_grav_1',
+    chapter: 'মহাকর্ষ ও অভিকর্ষ',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'পৃথিবীপৃষ্ঠ হতে কত উচ্চতায় অভিকর্ষজ ত্বরণের মান ভূপৃষ্ঠের মানের এক-চতুর্থাংশ (1/4) হবে? (পৃথিবীর ব্যাসার্ধ R = 6400 km)',
+    marks: 5,
+    solution: 'g_h = g · [R / (R + h)]²\n=> (1/4) g = g · [R / (R + h)]²\n=> R / (R + h) = 1/2\n=> R + h = 2R\n=> h = R = 6400 km।\nঅতএব, ভূপৃষ্ঠ হতে ৬৪০০ কিমি উচ্চতায়।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: 'qb_elas_1',
+    chapter: 'স্থিতিস্থাপকতা',
+    type: 'সংক্ষিপ্ত প্রশ্ন',
+    questionText: 'হুকের সূত্রটি বিবৃত কর এবং পয়েসনের অনুপাতের (Poisson\'s Ratio) তাত্ত্বিক ও ব্যবহারিক সীমা লিখ।',
+    marks: 3,
+    solution: 'হুকের সূত্র: স্থিতিস্থাপক সীমার মধ্যে পীড়ন বিকৃতির সমানুপাতিক (পীড়ন ∝ বিকৃতি)।\nপয়েসনের অনুপাত σ = - (পার্শ্ব বিকৃতি / দৈর্ঘ্য বিকৃতি)।\nতাত্ত্বিক সীমা: -1 হতে +0.5\nব্যবহারিক বা বাস্তব সীমা: 0 হতে +0.5।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: 'qb_thermo_1',
+    chapter: 'তাপ ও তাপগতিবিদ্যা',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'একটি কার্নো ইঞ্জিন 27°C এবং 327°C তাপমাত্রার মধ্যে কাজ করে। ইঞ্জিনটির কর্মদক্ষতা কত? যদি এটি উচ্চ তাপমাত্রা হতে 1200 J তাপ গ্রহণ করে তবে কতটুকু কাজ সম্পাদন করবে?',
+    marks: 5,
+    solution: 'T₁ = 327 + 273 = 600 K; T₂ = 27 + 273 = 300 K।\nকর্মদক্ষতা η = 1 - (T₂ / T₁) = 1 - (300 / 600) = 0.5 = ৫০%।\nসম্পাদিত কাজ W = η × Q₁ = 0.5 × 1200 J = 600 Joule।',
+    subject: 'পদার্থবিজ্ঞান',
+    createdAt: Date.now() - 86400000 * 2,
+  },
+  {
+    id: 'qb_chem_redox_1',
+    chapter: 'জারণ-বিজারণ',
+    type: 'সংক্ষিপ্ত প্রশ্ন',
+    questionText: 'KMnO₄, K₂Cr₂O₇ এবং Na₂S₂O₃ যৌগে যথাক্রমে Mn, Cr এবং S এর জারণ সংখ্যা নির্ণয় কর।',
+    marks: 4,
+    solution: '১. KMnO₄: 1 + x + 4(-2) = 0 => x = +7 (Mn এর জারণ মান +7)\n২. K₂Cr₂O₇: 2(1) + 2x + 7(-2) = 0 => 2x = 12 => x = +6 (Cr এর জারণ মান +6)\n৩. Na₂S₂O₃: 2(1) + 2x + 3(-2) = 0 => 2x = 4 => x = +2 (S এর জারণ মান +2)।',
+    subject: 'রসায়ন',
+    createdAt: Date.now() - 86400000 * 4,
+  },
+  {
+    id: 'qb_chem_redox_2',
+    chapter: 'জারণ-বিজারণ',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'অম্লীয় মাধ্যমে 0.02 M ঘনমাত্রার 25 mL KMnO₄ দ্রবণকে সম্পূর্ণ প্রশমিত করতে 0.05 M FeSO₄ দ্রবণের কত আয়তন প্রয়োজন হবে?',
+    marks: 5,
+    solution: 'আয়ন-ইলেকট্রন সমীকরণ অনুযায়ী: 2KMnO₄ ≡ 10FeSO₄ => 1 mol KMnO₄ ≡ 5 mol FeSO₄।\nসূত্র: V₁M₁ / n₁ = V₂M₂ / n₂\n=> (25 × 0.02) / 1 = (V₂ × 0.05) / 5\n=> 0.5 = 0.01 × V₂\n=> V₂ = 50 mL।\n∴ FeSO₄ দ্রবণের আয়তন ৫০ মিলিলিটার।',
+    subject: 'রসায়ন',
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: 'qb_chem_per_1',
+    chapter: 'পর্যায়বৃত্ত ধর্ম',
+    type: 'থিওরি / রচনামূলক',
+    questionText: 'পর্যায় সারণিতে পর্যায় ও গ্রুপভিত্তিক আয়নীকরণ শক্তির সাধারণ পরিবর্তন লিখ। ২য় পর্যায়ের Be ও B এবং N ও O এর আয়নীকরণ শক্তির ব্যতিক্রম ব্যাখ্যা কর।',
+    marks: 6,
+    solution: 'সাধারণ নিয়ম: একই পর্যায়ে বাম থেকে ডানে পারমাণবিক ব্যাসার্ধ হ্রাস পাওয়ায় আয়নীকরণ শক্তি বাড়ে; একই গ্রুপে উপর থেকে নিচে পারমাণবিক শক্তিস্তর বাড়ায় আয়নীকরণ শক্তি কমে।\nব্যতিক্রম ১: Be (1s² 2s²) এর 2s অরবিটাল পূর্ণ থাকায় এটি B (1s² 2s² 2p¹) অপেক্ষা অধিক স্থিতিশীল, তাই Be এর ১ম আয়নীকরণ শক্তি B অপেক্ষা বেশি।\nব্যতিক্রম ২: N (1s² 2s² 2p³) এর 2p অরবিটাল অর্ধপূর্ণ (p_x¹ p_y¹ p_z¹) থাকায় এটি O (1s² 2s² 2p⁴) অপেক্ষা স্থিতিশীল, ফলে N এর আয়নীকরণ শক্তি O অপেক্ষা বেশি।',
+    subject: 'রসায়ন',
+    createdAt: Date.now() - 86400000 * 4,
+  },
+  {
+    id: 'qb_chem_bond_1',
+    chapter: 'রাসায়নিক বন্ধন ও সংকেত',
+    type: 'সংক্ষিপ্ত প্রশ্ন',
+    questionText: 'অষ্টক নিয়ম (Octet Rule) এর সীমাবদ্ধতা বা ব্যতিক্রমসমূহ উদাহরণসহ লিখ।',
+    marks: 4,
+    solution: '১. অষ্টক সংকোচন (অসম্পূর্ণ অষ্টক): BeCl₂ (৪টি ইলেকট্রন), BF₃ ও AlCl₃ (৬টি ইলেকট্রন)।\n২. অষ্টক সম্প্রসারণ: PCl₅ (১০টি ইলেকট্রন), SF₆ (১২টি ইলেকট্রন), IF₇ (১৪টি ইলেকট্রন)।\n৩. বিজোড় ইলেকট্রন যৌগ: NO, NO₂।',
+    subject: 'রসায়ন',
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: 'qb_math_diff_1',
+    chapter: 'ডিফারেনশিয়েশন',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'y = x^(sin x) হলে dy/dx এর মান নির্ণয় কর।',
+    marks: 5,
+    solution: 'উভয়পক্ষে স্বাভাবিক লগারিদম (ln) নিয়ে:\nln y = ln(x^(sin x)) = sin x · ln x\nx এর সাপেক্ষে অন্তরীকরণ করে:\n(1/y) · (dy/dx) = cos x · ln x + sin x · (1/x)\n=> dy/dx = y · [cos x · ln x + (sin x / x)]\n∴ dy/dx = x^(sin x) · [cos x · ln x + (sin x / x)]।',
+    subject: 'গণিত',
+    createdAt: Date.now() - 86400000 * 5,
+  },
+  {
+    id: 'qb_math_diff_2',
+    chapter: 'ডিফারেনশিয়েশন',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'f(x) = 2x³ - 9x² + 12x + 5 ফাংশনটির চরম মান (গুরুমান ও লঘুমান) নির্ণয় কর।',
+    marks: 5,
+    solution: 'f\'(x) = 6x² - 18x + 12 = 6(x² - 3x + 2) = 6(x - 1)(x - 2)।\nচরম মানের জন্য f\'(x) = 0 => x = 1 অথবা x = 2।\nf\'\'(x) = 12x - 18।\n১. x = 1 হলে f\'\'(1) = 12 - 18 = -6 < 0, সুতরাং x = 1 এ গুরুমান বিদ্যমান। গুরুমান = 2(1)³ - 9(1)² + 12(1) + 5 = 10।\n২. x = 2 হলে f\'\'(2) = 24 - 18 = +6 > 0, সুতরাং x = 2 এ লঘুমান বিদ্যমান। লঘুমান = 2(8) - 9(4) + 12(2) + 5 = 16 - 36 + 24 + 5 = 9।',
+    subject: 'গণিত',
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: 'qb_math_int_1',
+    chapter: 'ইন্টিগ্রেশন',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'অনির্দিষ্ট যোগজ নির্ণয় কর: ∫ (x · e^x) / (1 + x)² dx',
+    marks: 5,
+    solution: '∫ e^x · [(1 + x - 1) / (1 + x)²] dx\n= ∫ e^x · [1/(1 + x) - 1/(1 + x)²] dx\nআমরা জানি, ∫ e^x [f(x) + f\'(x)] dx = e^x · f(x) + c।\nএখানে f(x) = 1/(1 + x) হলে f\'(x) = -1/(1 + x)²।\n∴ যোগজফল = [e^x / (1 + x)] + c।',
+    subject: 'গণিত',
+    createdAt: Date.now() - 86400000 * 5,
+  },
+  {
+    id: 'qb_math_int_2',
+    chapter: 'ইন্টিগ্রেশন',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'নির্দিষ্ট যোগজের মান নির্ণয় কর: ∫₀^(π/2) (√sin x) / (√sin x + √cos x) dx',
+    marks: 5,
+    solution: 'ধরি I = ∫₀^(π/2) [√sin x / (√sin x + √cos x)] dx  ---- (১)\nনির্দিষ্ট যোগজের ধর্ম ∫₀^a f(x)dx = ∫₀^a f(a - x)dx প্রয়োগ করে:\nI = ∫₀^(π/2) [√sin(π/2 - x) / (√sin(π/2 - x) + √cos(π/2 - x))] dx\nI = ∫₀^(π/2) [√cos x / (√cos x + √sin x)] dx  ---- (২)\n(১) ও (২) যোগ করে:\n2I = ∫₀^(π/2) [(√sin x + √cos x) / (√sin x + √cos x)] dx = ∫₀^(π/2) 1 dx = [x]₀^(π/2) = π/2\n∴ I = π / 4।',
+    subject: 'গণিত',
+    createdAt: Date.now() - 86400000 * 4,
+  },
+  {
+    id: 'qb_math_trig_1',
+    chapter: 'ত্রিকোণমিতি',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'প্রমাণ কর বা মান নির্ণয় কর: tan⁻¹(1/2) + tan⁻¹(1/3)',
+    marks: 3,
+    solution: 'সূত্র: tan⁻¹x + tan⁻¹y = tan⁻¹[(x + y) / (1 - xy)]\n= tan⁻¹[(1/2 + 1/3) / (1 - (1/2)(1/3))]\n= tan⁻¹[(5/6) / (5/6)]\n= tan⁻¹(1) = π/4 বা 45°।',
+    subject: 'গণিত',
+    createdAt: Date.now() - 86400000 * 2,
+  },
+  {
+    id: 'qb_civ_som_1',
+    chapter: 'স্ট্রেন্থ অব মেটেরিয়ালস',
+    type: 'থিওরি / রচনামূলক',
+    questionText: 'সহজভাবে সমর্থিত বিমের ওপর সমভাবে বিস্তৃত লোড (UDL) প্রয়োগ করা হলে শিয়ার ফোর্স (SFD) ও বেন্ডিং মোমেন্ট (BMD) ডায়াগ্রামের প্রকৃতি ব্যাখ্যা কর।',
+    marks: 5,
+    solution: '১. রিয়্যাকশন: L দৈর্ঘ্যের বিমে প্রতি মিটারে w লোড থাকলে উভয় সাপোর্টে রিয়্যাকশন R_A = R_B = wL/2।\n২. শিয়ার ফোর্স (SFD): সাপোর্টে মান wL/2 এবং স্প্যানের মাঝখানে শূন্য। ডায়াগ্রামটি একঘাতী বা ইনক্লাইন্ড সরলরেখা।\n৩. বেন্ডিং মোমেন্ট (BMD): উভয় সাপোর্টে শূন্য এবং স্প্যানের মাঝখানে (যেখানে SF = 0) সর্বোচ্চ। সর্বোচ্চ মোমেন্ট M_max = wL²/8। ডায়াগ্রামটি দ্বিঘাতী প্যারাবলিক বক্ররেখা।',
+    subject: 'সিভিল ইঞ্জিনিয়ারিং',
+    createdAt: Date.now() - 86400000 * 5,
+  },
+  {
+    id: 'qb_civ_som_2',
+    chapter: 'স্ট্রেন্থ অব মেটেরিয়ালস',
+    type: 'সংক্ষিপ্ত প্রশ্ন',
+    questionText: 'পয়েন্ট অব কন্ট্রাফ্লেক্সার (Point of Contraflexure) বা ইনফ্লেকশন পয়েন্ট কাকে বলে?',
+    marks: 3,
+    solution: 'কোনো বিমের যে বিন্দুতে বেন্ডিং মোমেন্টের মান শূন্য হয় এবং এর চিহ্ন ধনাত্মক থেকে ঋণাত্মক বা ঋণাত্মক থেকে ধনাত্মক দিকে পরিবর্তিত হয় (অর্থাৎ স্যাচিং থেকে হগিং বা হগিং থেকে স্যাচিং হয়), তাকে পয়েন্ট অব কন্ট্রাফ্লেক্সার বা পয়েন্ট অব ইনফ্লেকশন বলে। এটি সাধারণত ওভারহ্যাংগিং বা কন্টিনিউয়াস বিমে দেখা যায়।',
+    subject: 'সিভিল ইঞ্জিনিয়ারিং',
+    createdAt: Date.now() - 86400000 * 4,
+  },
+  {
+    id: 'qb_civ_surv_1',
+    chapter: 'সার্ভেয়িং',
+    type: 'গাণিতিক সমস্যা',
+    questionText: 'একটি লাইনের ফোর বেয়ারিং (Fore Bearing) 30°45\' হলে এর ব্যাক বেয়ারিং (Back Bearing) কত? অপর একটি লাইনের FB 215°30\' হলে এর BB কত?',
+    marks: 4,
+    solution: 'নিয়ম: যদি FB < 180° হয়, তবে BB = FB + 180°। যদি FB > 180° হয়, তবে BB = FB - 180°।\n১ম লাইন: FB = 30°45\' (< 180°), অতএব BB = 30°45\' + 180° = 210°45\'।\n২য় লাইন: FB = 215°30\' (> 180°), অতএব BB = 215°30\' - 180° = 35°30\'।',
+    subject: 'সিভিল ইঞ্জিনিয়ারিং',
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: 'qb_org_chem_1',
+    chapter: 'জৈব রসায়ন',
+    type: 'সংক্ষিপ্ত প্রশ্ন',
+    questionText: 'উর্টজ বিক্রিয়া (Wurtz Reaction) এবং মার্কনিকভ নিয়ম (Markovnikov\'s Rule) উদাহরণসহ সংক্ষেপে লিখ।',
+    marks: 4,
+    solution: '১. উর্টজ বিক্রিয়া: শুষ্ক ইথারে দ্রবীভূত অ্যালকাইল হ্যালাইডের সাথে সোডিয়াম ধাতুর বিক্রিয়ায় দ্বিগুণ কার্বনবিশিষ্ট অ্যালকেন তৈরি হয়।\n2CH₃-I + 2Na -> CH₃-CH₃ + 2NaI।\n২. মার্কনিকভ নিয়ম: অপ্রতিসম অ্যালকিনের সাথে অপ্রতিসম বিকারকের (যেমন HBr) যুত বিক্রিয়ায় বিকারকের ঋণাত্মক অংশটি দ্বিবন্ধনযুক্ত সেই কার্বনে যুক্ত হয় যাতে কম সংখ্যক হাইড্রোজেন পরমাণু থাকে।\nCH₃-CH=CH₂ + HBr -> CH₃-CH(Br)-CH₃ (২-ব্রোমোপ্রোপেন)।',
+    subject: 'রসায়ন',
+    createdAt: Date.now() - 86400000 * 2,
+  },
+];
+
+/**
+ * Loads the user's custom question bank from local storage.
+ * If empty, seeds with initial diverse sample admission questions.
+ */
+export function getSavedQuestionBank(): SavedQuestionBankItem[] {
+  try {
+    const raw = localStorage.getItem(QUESTION_BANK_KEY);
+    if (!raw) {
+      localStorage.setItem(QUESTION_BANK_KEY, JSON.stringify(DEFAULT_QUESTION_BANK_SEEDS));
+      return DEFAULT_QUESTION_BANK_SEEDS;
+    }
+    const parsed: SavedQuestionBankItem[] = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(QUESTION_BANK_KEY, JSON.stringify(DEFAULT_QUESTION_BANK_SEEDS));
+      return DEFAULT_QUESTION_BANK_SEEDS;
+    }
+    return parsed;
+  } catch (err) {
+    console.error('Failed to load saved question bank', err);
+    return DEFAULT_QUESTION_BANK_SEEDS;
+  }
+}
+
+/**
+ * Saves question bank items to local storage.
+ */
+export function saveSavedQuestionBank(items: SavedQuestionBankItem[]): void {
+  try {
+    localStorage.setItem(QUESTION_BANK_KEY, JSON.stringify(items));
+  } catch (err) {
+    console.error('Failed to save question bank', err);
+  }
+}
+
+/**
+ * Adds a new question item to local storage.
+ */
+export function addQuestionToBank(
+  item: Omit<SavedQuestionBankItem, 'id' | 'createdAt'>
+): SavedQuestionBankItem {
+  const current = getSavedQuestionBank();
+  const newItem: SavedQuestionBankItem = {
+    ...item,
+    id: `qb_item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    createdAt: Date.now(),
+  };
+  const updated = [newItem, ...current];
+  saveSavedQuestionBank(updated);
+  return newItem;
+}
+
+/**
+ * Updates an existing question in local storage.
+ */
+export function updateQuestionInBank(item: SavedQuestionBankItem): void {
+  const current = getSavedQuestionBank();
+  const index = current.findIndex((q) => q.id === item.id);
+  if (index !== -1) {
+    current[index] = item;
+    saveSavedQuestionBank([...current]);
+  }
+}
+
+/**
+ * Deletes a question from local storage.
+ */
+export function deleteQuestionFromBank(id: string): void {
+  const current = getSavedQuestionBank();
+  const updated = current.filter((q) => q.id !== id);
+  saveSavedQuestionBank(updated);
+}
+
+/**
+ * Resets the question bank to the initial default seed set.
+ */
+export function resetQuestionBankToDefault(): SavedQuestionBankItem[] {
+  saveSavedQuestionBank(DEFAULT_QUESTION_BANK_SEEDS);
+  return DEFAULT_QUESTION_BANK_SEEDS;
+}
+
 

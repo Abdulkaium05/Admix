@@ -29,6 +29,9 @@ import {
 } from 'lucide-react';
 import {
   chemistryFormulas,
+  formulaGroupStats,
+  FormulaGroup,
+  filterFormulasByGroup,
   generateChemistryQuiz,
   generateRecallQuestions,
   ChemistryQuizQuestion,
@@ -56,10 +59,19 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
   const [currentView, setCurrentView] = useState<ChemistryView>('hub');
   const [radicalsInitialTab, setRadicalsInitialTab] = useState<'quiz' | 'recall' | 'sheet'>('quiz');
 
+  // Formula Group Selection: 'A' (User Provided Images), 'B' (Other DUET Formulas), or 'both'
+  const [formulaGroup, setFormulaGroup] = useState<FormulaGroup>('both');
+  const [guideGroup, setGuideGroup] = useState<FormulaGroup>('both');
+
   // Quiz Settings State
-  const [questionCount, setQuestionCount] = useState<number>(15); // Default 15 (between 10-30 or all 64)
+  const [questionCount, setQuestionCount] = useState<number>(15);
   const [quizMode, setQuizMode] = useState<QuizMode>('exam');
   const [quizPhase, setQuizPhase] = useState<QuizPhase>('setup');
+
+  // Max count available based on group selection
+  const maxAvailableFormulas = useMemo(() => {
+    return filterFormulasByGroup(formulaGroup).length;
+  }, [formulaGroup]);
 
   // Active Quiz State (MCQ)
   const [questions, setQuestions] = useState<ChemistryQuizQuestion[]>([]);
@@ -82,14 +94,14 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
   // Start Quiz Handler
   const handleStartQuiz = () => {
     if (quizMode === 'recall') {
-      const generated = generateRecallQuestions(questionCount, recallDirection);
+      const generated = generateRecallQuestions(questionCount, recallDirection, formulaGroup);
       setRecallQuestions(generated);
       setCurrentIndex(0);
       setRecallRevealed({});
       setRecallFeedback({});
       setQuizPhase('active');
     } else {
-      const generated = generateChemistryQuiz(questionCount);
+      const generated = generateChemistryQuiz(questionCount, formulaGroup);
       setQuestions(generated);
       setCurrentIndex(0);
       setUserAnswers({});
@@ -206,6 +218,8 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
   // Filtered Formulas for Formula Guide
   const filteredFormulas = useMemo(() => {
     return chemistryFormulas.filter((item) => {
+      if (guideGroup !== 'both' && item.group !== guideGroup) return false;
+
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -220,7 +234,7 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
       if (selectedCategory === 'DUET বিগত প্রশ্ন') return !!item.duetRef;
       return item.category === selectedCategory;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, guideGroup]);
 
   const categories = ['সবগুলো', 'DUET বিগত প্রশ্ন', 'এসিড', 'ক্ষার', 'লবণ', 'গ্যাস', 'খনিজ', 'জৈব যৌগ', 'মিশ্রণ'];
 
@@ -614,12 +628,129 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                     </span>
                     <div>
                       <h2 className="text-base sm:text-lg font-bold text-emerald-950">
-                        রাসায়নিক সংকেত কুইজ
+                        রাসায়নিক সংকেত কুইজ ও রিভেল টেস্ট
                       </h2>
                       <p className="text-xs text-emerald-700/80">
-                        ডুয়েট ভর্তি পরীক্ষায় বিগত বছরে আসা ও সর্বাধিক গুরুত্বপূর্ণ সংকেত
+                        বাণিজ্যিক নাম, প্রচলিত সংকেত ও বিগত ডুয়েট ভর্তি পরীক্ষার প্রস্তুতি
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* Group Selector: Group A, Group B, or Both */}
+                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-emerald-600" />
+                      <span>গ্রুপ নির্বাচন (Group Selection):</span>
+                    </label>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono">
+                      মোট {maxAvailableFormulas}টি সংকেত
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Both Groups */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormulaGroup('both');
+                        setQuestionCount((prev) => Math.min(prev, formulaGroupStats.total));
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        formulaGroup === 'both'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold">উভয় গ্রুপ (A + B)</span>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                            formulaGroup === 'both'
+                              ? 'bg-emerald-700 text-emerald-100'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {formulaGroupStats.total}টি
+                        </span>
+                      </div>
+                      <p
+                        className={`text-[10px] mt-0.5 ${
+                          formulaGroup === 'both' ? 'text-emerald-100' : 'text-emerald-700/80'
+                        }`}
+                      >
+                        সকল বাণিজ্যিক ও ভর্তি পরীক্ষার সংকেত
+                      </p>
+                    </button>
+
+                    {/* Group A (User Provided 2 Images) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormulaGroup('A');
+                        setQuestionCount((prev) => Math.min(prev, formulaGroupStats.groupA));
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        formulaGroup === 'A'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold">গ্রুপ A (বাণিজ্যিক সংকেত)</span>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                            formulaGroup === 'A'
+                              ? 'bg-emerald-700 text-emerald-100'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {formulaGroupStats.groupA}টি
+                        </span>
+                      </div>
+                      <p
+                        className={`text-[10px] mt-0.5 ${
+                          formulaGroup === 'A' ? 'text-emerald-100' : 'text-emerald-700/80'
+                        }`}
+                      >
+                        শীটের সকল বাণিজ্যিক নাম ও সংকেত
+                      </p>
+                    </button>
+
+                    {/* Group B (Other DUET Formulas) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormulaGroup('B');
+                        setQuestionCount((prev) => Math.min(prev, formulaGroupStats.groupB));
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        formulaGroup === 'B'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold">গ্রুপ B (অন্যান্য সংকেত)</span>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                            formulaGroup === 'B'
+                              ? 'bg-emerald-700 text-emerald-100'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {formulaGroupStats.groupB}টি
+                        </span>
+                      </div>
+                      <p
+                        className={`text-[10px] mt-0.5 ${
+                          formulaGroup === 'B' ? 'text-emerald-100' : 'text-emerald-700/80'
+                        }`}
+                      >
+                        বিগত বছরের অন্যান্য গুরুত্বপূর্ণ সংকেত
+                      </p>
+                    </button>
                   </div>
                 </div>
 
@@ -631,50 +762,51 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                       <span>
                         {quizMode === 'recall'
                           ? 'অনুশীলনের জন্য সংকেত সংখ্যা নির্বাচন করুন:'
-                          : 'প্রশ্নের সংখ্যা নির্বাচন করুন (১০ - ৩০ টি):'}
+                          : 'প্রশ্নের সংখ্যা নির্বাচন করুন:'}
                       </span>
                     </label>
                     <span className="text-sm sm:text-base font-extrabold text-emerald-900 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg font-mono">
-                      {questionCount === chemistryFormulas.length ? 'সবগুলো (৬৪টি)' : `${questionCount} টি`}
+                      {questionCount >= maxAvailableFormulas ? `সবগুলো (${maxAvailableFormulas}টি)` : `${questionCount} টি`}
                     </span>
                   </div>
 
                   {/* Preset Buttons */}
-                  <div className={`grid gap-1.5 sm:gap-2 ${quizMode === 'recall' ? 'grid-cols-5' : 'grid-cols-5'}`}>
-                    {(quizMode === 'recall'
-                      ? [10, 15, 20, 30, chemistryFormulas.length]
-                      : [10, 15, 20, 25, 30]
-                    ).map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setQuestionCount(num)}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                          questionCount === num
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs scale-102'
-                            : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-100/60'
-                        }`}
-                      >
-                        {num === chemistryFormulas.length ? 'সবগুলো' : `${num} টি`}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                    {[10, 15, 20, 30, maxAvailableFormulas].map((num) => {
+                      const displayNum = Math.min(num, maxAvailableFormulas);
+                      const isAll = num === maxAvailableFormulas;
+                      return (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => setQuestionCount(displayNum)}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            questionCount === displayNum
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs scale-102'
+                              : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-100/60'
+                          }`}
+                        >
+                          {isAll ? `সব (${maxAvailableFormulas})` : `${displayNum} টি`}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Range Slider */}
                   <div className="pt-2">
                     <input
                       type="range"
-                      min={10}
-                      max={quizMode === 'recall' ? chemistryFormulas.length : 30}
+                      min={Math.min(5, maxAvailableFormulas)}
+                      max={maxAvailableFormulas}
                       step={1}
-                      value={questionCount}
+                      value={Math.min(questionCount, maxAvailableFormulas)}
                       onChange={(e) => setQuestionCount(Number(e.target.value))}
                       className="w-full accent-emerald-600 cursor-pointer h-2 bg-emerald-200 rounded-lg"
                     />
                     <div className="flex justify-between text-[10px] font-mono text-emerald-700/80 mt-1">
-                      <span>১০ টি</span>
-                      <span>২০ টি</span>
-                      <span>{quizMode === 'recall' ? `${chemistryFormulas.length} টি (সব)` : '৩০ টি'}</span>
+                      <span>{Math.min(5, maxAvailableFormulas)} টি</span>
+                      <span>{Math.round(maxAvailableFormulas / 2)} টি</span>
+                      <span>{maxAvailableFormulas} টি (সব)</span>
                     </div>
                   </div>
                 </div>
@@ -905,6 +1037,9 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                 {/* Badges row */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                      গ্রুপ {currentRecallQ.group}
+                    </span>
                     {currentRecallQ.duetRef && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
                         <GraduationCap className="w-3 h-3 text-amber-600" />
@@ -1224,12 +1359,17 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
               {/* Question Card */}
               <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-emerald-200 shadow-xs space-y-5">
                 <div className="space-y-2">
-                  {currentQ.duetRef && (
-                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
-                      <GraduationCap className="w-3 h-3 text-amber-600" />
-                      <span>{currentQ.duetRef}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                      গ্রুপ {currentQ.group}
+                    </span>
+                    {currentQ.duetRef && (
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                        <GraduationCap className="w-3 h-3 text-amber-600" />
+                        <span>{currentQ.duetRef}</span>
+                      </div>
+                    )}
+                  </div>
 
                   <h2 className="text-base sm:text-lg font-bold text-emerald-950 leading-relaxed">
                     {currentQ.questionText}
@@ -1470,9 +1610,12 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
                               #{idx + 1}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                              গ্রুপ {q.group}
                             </span>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                               {q.direction === 'name_to_formula' ? 'নাম ➔ সংকেত' : 'সংকেত ➔ নাম'}
@@ -1622,9 +1765,12 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
                               #{idx + 1}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                              গ্রুপ {q.group}
                             </span>
                             {q.duetRef && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
@@ -1688,6 +1834,43 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
         <div className="space-y-4">
           {/* Search and Filters */}
           <div className="p-4 rounded-2xl bg-white border border-emerald-100 shadow-2xs space-y-3">
+            {/* Group Filter Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-emerald-50 rounded-xl border border-emerald-200">
+              <button
+                type="button"
+                onClick={() => setGuideGroup('both')}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  guideGroup === 'both'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-emerald-800 hover:text-emerald-950'
+                }`}
+              >
+                সবগুলো ({formulaGroupStats.total})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGuideGroup('A')}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  guideGroup === 'A'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-emerald-800 hover:text-emerald-950'
+                }`}
+              >
+                গ্রুপ A ({formulaGroupStats.groupA})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGuideGroup('B')}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  guideGroup === 'B'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-emerald-800 hover:text-emerald-950'
+                }`}
+              >
+                গ্রুপ B ({formulaGroupStats.groupB})
+              </button>
+            </div>
+
             {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -1741,6 +1924,11 @@ export const ChemistryScreen: React.FC<ChemistryScreenProps> = ({ language, onBa
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+                        গ্রুপ {item.group}
+                      </span>
+                    </div>
                     <h3 className="text-sm sm:text-base font-bold text-emerald-950">
                       {item.commonName}
                     </h3>
